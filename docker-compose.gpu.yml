@@ -1,0 +1,32 @@
+services:
+  backend:
+    gpus: all
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      TRANSFORMERS_CACHE: /root/.cache/huggingface
+      CUDA_VISIBLE_DEVICES: "0"
+      APP_ENV: production
+    volumes:
+      - ./storage:/app/storage
+      - hf_cache:/root/.cache/huggingface
+      - torch_cache:/root/.cache/torch
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    shm_size: "8gb"
+
+  worker:
+    gpus: all
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      TRANSFORMERS_CACHE: /root/.cache/huggingface
+      CUDA_VISIBLE_DEVICES: "0"
+      APP_ENV: production
+    volumes:
+      - ./storage:/app/storage
+      - hf_cache:/root/.cache/huggingface
+      - torch_cache:/root/.cache/torch
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO --concurrency=1
+    shm_size: "8gb"
+
+volumes:
+  hf_cache:
+  torch_cache:

@@ -1,0 +1,741 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Alert from '@mui/material/Alert';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Snackbar from '@mui/material/Snackbar';
+import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import Drawer from '@mui/material/Drawer';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
+
+import { BACKEND_BASE_URL } from '../api/client';
+import { getDocument, listDocuments, uploadDocument, uploadDocumentBatch } from '../api/documents';
+import { createIndexRow, deleteIndexRow, getIndexRows, manualScan, startIndexing, updateIndexRow } from '../api/indexing';
+import { clearPendingQueue, getActiveQueue, getOpsStatus, restartDocumentProcessing, stopDocumentProcessing } from '../api/ops';
+import { getDocumentPages } from '../api/pages';
+
+import DocumentLibrary from '../components/documents/DocumentLibrary';
+import DocumentDetailsPanel from '../components/documents/DocumentDetailsPanel';
+import UploadPanel from '../components/documents/UploadPanel';
+import SearchBar from '../components/documents/SearchBar';
+import ManualScanPanel from '../components/indexing/ManualScanPanel';
+import ReviewSummary from '../components/indexing/ReviewSummary';
+import IndexRowTable from '../components/indexing/IndexRowTable';
+import IndexEditorDrawer from '../components/indexing/IndexEditorDrawer';
+import PdfViewerPanel from '../components/pdf/PdfViewerPanel';
+import ChatPanel from '../components/chat/ChatPanel';
+import OpsModal from '../components/ops/OpsModal';
+
+import { useAppStore } from '../store/useAppStore';
+import { useDocumentPolling } from '../hooks/useDocumentPolling';
+import { useOpsPolling } from '../hooks/useOpsPolling';
+import type { DocumentItem, IndexRow, OpsQueueItem } from '../types';
+
+function statusTone(status?: string) {
+  const s = (status || '').toUpperCase();
+  if (s.includes('FAILED')) return 'error';
+  if (s.includes('REVIEW')) return 'warning';
+  if (s.includes('OCR') || s.includes('RUNNING') || s.includes('INDEXING')) return 'info';
+  if (s.includes('INDEX') || s.includes('DONE') || s.includes('PARSED') || s.includes('READY')) return 'success';
+  return 'default';
+}
+
+function extractApiError(error: unknown, fallback: string): string {
+  const anyErr = error as any;
+  return anyErr?.response?.data?.detail || anyErr?.message || fallback;
+}
+
+export default function DashboardPage() {
+  const {
+    documents,
+    selectedDocument,
+    indexRows,
+    opsStatus,
+    currentPdfPage,
+    pdfJumpTarget,
+    opsOpen,
+    indexEditorOpen,
+    activeRow,
+    setDocuments,
+    setSelectedDocument,
+    setIndexRows,
+    setDocumentPages,
+    setOpsStatus,
+    setCurrentPdfPage,
+    setPdfJumpTarget,
+    setOpsOpen,
+    setIndexEditorOpen,
+    setActiveRow,
+    upsertRow
+  } = useAppStore();
+
+  const [loadingPage, setLoadingPage] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [opsBusy, setOpsBusy] = useState(false);
+  const [activeQueue, setActiveQueue] = useState<OpsQueueItem[]>([]);
+  const [leftTab, setLeftTab] = useState<'index' | 'chat'>('index');
+  const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
+  const reviewWorkspaceRef = useRef<HTMLDivElement | null>(null);
+
+  const [toast, setToast] = useState<{
+    open: boolean;
+    type: 'success' | 'error' | 'info';
+    message: string;
+  }>({
+    open: false,
+    type: 'success',
+    message: ''
+  });
+
+  const selectedDocumentId = selectedDocument?.id;
+
+  useDocumentPolling(selectedDocumentId);
+  useOpsPolling();
+
+  const selectedDocActiveJobs = useMemo(
+    () =>
+      activeQueue.filter(
+        (q) =>
+          q.document_id === selectedDocumentId &&
+          (q.status === 'PENDING' || q.status === 'RUNNING') &&
+          !q.is_stuck
+      ),
+    [activeQueue, selectedDocumentId]
+  );
+
+  const indexingCompleted = useMemo(() => {
+    const s = (selectedDocument?.status || '').toUpperCase();
+    return ['CHAT_READY', 'COMPLETED', 'APPROVED', 'REVIEW_REQUIRED'].includes(s);
+  }, [selectedDocument?.status]);
+
+  const indexStartDisabledReason = useMemo(() => {
+    if (!selectedDocument) return 'Select a PDF first.';
+    if (selectedDocActiveJobs.length > 0) return 'Indexing is already running for this PDF. Please wait or stop it from Operations.';
+    if (indexingCompleted) return 'Indexing is already completed for this PDF.';
+    return undefined;
+  }, [selectedDocument, selectedDocActiveJobs.length, indexingCompleted]);
+
+  const pdfUrl = useMemo(() => {
+    if (!selectedDocumentId) return null;
+    return `${BACKEND_BASE_URL}/api/v1/documents/${selectedDocumentId}/file`;
+  }, [selectedDocumentId]);
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToast({ open: true, type, message });
+  };
+
+  const refreshAll = async (keepDocumentId?: number) => {
+    setLoadingPage(true);
+    try {
+      const [docs, ops, queue] = await Promise.all([listDocuments(), getOpsStatus(), getActiveQueue()]);
+      setDocuments(docs);
+      setOpsStatus(ops);
+      setActiveQueue(queue);
+
+      const targetId = keepDocumentId ?? selectedDocumentId ?? docs[0]?.id;
+      if (targetId) {
+        const [doc, rows, pages] = await Promise.all([
+          getDocument(targetId),
+          getIndexRows(targetId),
+          getDocumentPages(targetId)
+        ]);
+        setSelectedDocument(doc);
+        setIndexRows(rows);
+        setDocumentPages(pages);
+      } else {
+        setSelectedDocument(null);
+        setIndexRows([]);
+        setDocumentPages([]);
+      }
+    } catch {
+      showToast('error', 'Failed to refresh dashboard data.');
+    } finally {
+      setLoadingPage(false);
+    }
+  };
+
+  const refreshOpsQueue = async () => {
+    try {
+      const [ops, queue] = await Promise.all([getOpsStatus(), getActiveQueue()]);
+      setOpsStatus(ops);
+      setActiveQueue(queue);
+    } catch {
+      showToast('error', 'Failed to refresh operations queue.');
+    }
+  };
+
+  useEffect(() => {
+    refreshAll();
+  }, []);
+
+  useEffect(() => {
+    const fetchQueue = async () => {
+      try {
+        const queue = await getActiveQueue();
+        setActiveQueue(queue);
+      } catch {
+      }
+    };
+
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (opsOpen) {
+      refreshOpsQueue();
+    }
+  }, [opsOpen]);
+
+  const handleSelectDocument = async (doc: DocumentItem) => {
+    setSelectedDocument(doc);
+    setCurrentPdfPage(1);
+    setPdfJumpTarget(1);
+
+    try {
+      const [freshDoc, rows, pages] = await Promise.all([
+        getDocument(doc.id),
+        getIndexRows(doc.id),
+        getDocumentPages(doc.id),
+      ]);
+      setSelectedDocument(freshDoc);
+      setIndexRows(rows);
+      setDocumentPages(pages);
+
+      // If index exists, keep index workspace visible and jump PDF to first index page.
+      if (rows.length > 0) {
+        setLeftTab('index');
+        const firstJumpPage = rows
+          .map((r) => r.page_from || r.source_page_no || 1)
+          .sort((a, b) => a - b)[0];
+        setPdfJumpTarget(firstJumpPage);
+        setCurrentPdfPage(firstJumpPage);
+
+        setTimeout(() => {
+          reviewWorkspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 0);
+      }
+    } catch {
+      showToast('error', 'Could not load selected document.');
+    }
+  };
+
+  const handleUpload = async (file: File, cnr?: string, batchNo?: string) => {
+    setActionBusy(true);
+    try {
+      const created = await uploadDocument(file, cnr, batchNo);
+      await refreshAll(created.id);
+      showToast('success', 'PDF uploaded successfully.');
+    } catch {
+      showToast('error', 'Upload failed.');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleBatchUpload = async (files: File[], batchNo?: string) => {
+    setActionBusy(true);
+    try {
+      await uploadDocumentBatch(files, batchNo);
+      await refreshAll();
+      showToast('success', `Batch upload queued (${files.length} files).`);
+    } catch (error) {
+      showToast('error', extractApiError(error, 'Batch upload failed.'));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleSearch = async (params: { cnr?: string; batch_no?: string }) => {
+    setLoadingPage(true);
+    try {
+      const docs = await listDocuments(params);
+      setDocuments(docs);
+
+      if (docs.length > 0) {
+        await handleSelectDocument(docs[0]);
+      } else {
+        setSelectedDocument(null);
+        setIndexRows([]);
+        setDocumentPages([]);
+        showToast('info', 'No matching documents found.');
+      }
+    } catch {
+      showToast('error', 'Search failed.');
+    } finally {
+      setLoadingPage(false);
+    }
+  };
+
+  const handleStartDefault = async () => {
+    if (!selectedDocument) return;
+    if (indexStartDisabledReason) {
+      showToast('info', indexStartDisabledReason);
+      return;
+    }
+
+    setActionBusy(true);
+    try {
+      await startIndexing(selectedDocument.id, { start_page: 1, end_page: 10 });
+      showToast('success', 'Strict indexing started.');
+      await refreshAll(selectedDocument.id);
+    } catch (error) {
+      showToast('error', extractApiError(error, 'Failed to start indexing.'));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleManualScan = async (startPage: number, endPage: number) => {
+    if (!selectedDocument) return;
+    if (indexStartDisabledReason) {
+      showToast('info', indexStartDisabledReason);
+      return;
+    }
+
+    setActionBusy(true);
+    try {
+      await manualScan(selectedDocument.id, { start_page: startPage, end_page: endPage });
+      showToast('success', `Manual scan started for pages ${startPage}-${endPage}.`);
+      await refreshAll(selectedDocument.id);
+    } catch (error) {
+      showToast('error', extractApiError(error, 'Manual scan failed.'));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleJump = (pageNo: number) => {
+    setPdfJumpTarget(pageNo);
+    setCurrentPdfPage(pageNo);
+  };
+
+  const handleEdit = (row: IndexRow) => {
+    setActiveRow(row);
+    setIndexEditorOpen(true);
+  };
+
+  const handleSaveRow = async (payload: Partial<IndexRow>) => {
+    try {
+      if (activeRow?.id && activeRow.id !== 0) {
+        const updated = await updateIndexRow(activeRow.id, payload);
+        upsertRow(updated);
+      } else if (selectedDocument) {
+        const created = await createIndexRow(selectedDocument.id, payload);
+        upsertRow(created);
+      }
+      showToast('success', 'Row saved.');
+    } catch {
+      showToast('error', 'Failed to save row.');
+    }
+  };
+
+  const handleDeleteRow = async (row: IndexRow) => {
+    try {
+      await deleteIndexRow(row.id);
+      setIndexRows(indexRows.filter((r) => r.id !== row.id));
+      showToast('success', 'Row deleted.');
+    } catch {
+      showToast('error', 'Failed to delete row.');
+    }
+  };
+
+  const handleStopSelected = async () => {
+    if (!selectedDocument) return;
+    setOpsBusy(true);
+    try {
+      await stopDocumentProcessing(selectedDocument.id);
+      showToast('success', 'Stopped selected document processing.');
+      await refreshAll(selectedDocument.id);
+    } catch {
+      showToast('error', 'Failed to stop selected document.');
+    } finally {
+      setOpsBusy(false);
+    }
+  };
+
+  const handleRestartSelected = async () => {
+    if (!selectedDocument) return;
+    setOpsBusy(true);
+    try {
+      await restartDocumentProcessing(selectedDocument.id);
+      showToast('success', 'Restarted selected document processing.');
+      await refreshAll(selectedDocument.id);
+    } catch {
+      showToast('error', 'Failed to restart selected document.');
+    } finally {
+      setOpsBusy(false);
+    }
+  };
+
+  const handleClearPendingQueue = async () => {
+    setOpsBusy(true);
+    try {
+      const result = await clearPendingQueue();
+      showToast('success', `Cleared ${result.affected} pending tasks.`);
+      await refreshOpsQueue();
+    } catch {
+      showToast('error', 'Failed to clear pending queue.');
+    } finally {
+      setOpsBusy(false);
+    }
+  };
+
+  const handleStopDocumentFromQueue = async (documentId: number) => {
+    setOpsBusy(true);
+    try {
+      await stopDocumentProcessing(documentId);
+      showToast('success', `Stopped document #${documentId}.`);
+      await refreshAll(selectedDocumentId);
+    } catch {
+      showToast('error', `Failed to stop document #${documentId}.`);
+    } finally {
+      setOpsBusy(false);
+    }
+  };
+
+  const reviewCount = indexRows.filter((r) => r.status === 'REVIEW').length;
+  const autoOkCount = indexRows.filter((r) => r.status === 'AUTO_OK').length;
+
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f4f7fb' }}>
+      <AppBar
+        position="sticky"
+        elevation={0}
+        color="inherit"
+        sx={{
+          borderBottom: '1px solid #e5e7eb',
+          bgcolor: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <Toolbar sx={{ gap: 2, minHeight: 72 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 220 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2,
+                bgcolor: '#e8f0ff',
+                color: '#2f6bff',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 800
+              }}
+            >
+              CF
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight={800} lineHeight={1.1}>
+                Court File Indexer
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Queue + review dashboard
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Box sx={{ flex: 1 }} />
+
+          <Stack direction="row" spacing={1} alignItems="center">
+            {opsStatus ? (
+              <>
+                <Chip size="small" label={`Indexed ${opsStatus.indexed_count}`} color="success" variant="outlined" />
+                <Chip size="small" label={`Review ${opsStatus.review_queue_count}`} color="warning" variant="outlined" />
+                <Chip size="small" label={`Pending ${opsStatus.pending_queue_count}`} color="info" variant="outlined" />
+              </>
+            ) : null}
+
+            <Button
+              variant="outlined"
+              startIcon={<SettingsRoundedIcon />}
+              onClick={() => setOpsOpen(true)}
+              sx={{ textTransform: 'none', borderRadius: 2 }}
+            >
+              Operations
+            </Button>
+
+            <Tooltip title="Refresh dashboard">
+              <span>
+                <IconButton onClick={() => refreshAll()} disabled={loadingPage || actionBusy}>
+                  {loadingPage ? <CircularProgress size={18} /> : <RefreshRoundedIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth={false} sx={{ py: 2.5, px: { xs: 2, lg: 3 } }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 3fr) minmax(0, 2fr)' },
+            gap: 2,
+            height: { xl: 'calc(100vh - 120px)' },
+            overflow: { xl: 'hidden' }
+          }}
+        >
+          <Stack
+            spacing={2}
+            sx={{
+              minWidth: 0,
+              height: { xl: 'calc(100vh - 120px)' },
+              overflow: { xl: 'hidden' }
+            }}
+          >
+            <Box
+              sx={{
+                minHeight: 0,
+                overflowY: { xl: 'auto' },
+                pr: { xl: 1 },
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
+              }}
+            >
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', lg: '380px minmax(0, 1fr)' },
+                    gap: 2
+                  }}
+                >
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                      <UploadFileRoundedIcon fontSize="small" color="primary" />
+                      <Typography fontWeight={700}>Upload PDF</Typography>
+                    </Stack>
+                    <UploadPanel onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
+                  </Box>
+
+                  <Stack spacing={2} minWidth={0}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <SearchRoundedIcon fontSize="small" color="primary" />
+                      <Typography fontWeight={700}>Search and library</Typography>
+                    </Stack>
+
+                    <SearchBar onSearch={handleSearch} />
+
+                    <DocumentLibrary
+                      documents={documents}
+                      selectedDocumentId={selectedDocument?.id}
+                      onSelect={handleSelectDocument}
+                    />
+                  </Stack>
+                </Box>
+              </Paper>
+
+              <DocumentDetailsPanel document={selectedDocument} />
+
+              <ManualScanPanel
+                disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
+                disabledReason={indexStartDisabledReason}
+                onStartDefault={handleStartDefault}
+                onManualScan={handleManualScan}
+              />
+
+              <ReviewSummary rows={indexRows} />
+            </Box>
+
+            <Paper
+              variant="outlined"
+              ref={reviewWorkspaceRef}
+              sx={{
+                borderRadius: 3,
+                overflow: 'hidden',
+                bgcolor: 'background.paper',
+                minHeight: { xl: '42vh' },
+                maxHeight: { xl: '52vh' },
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0
+              }}
+            >
+              <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <TableRowsRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Review workspace</Typography>
+                  </Stack>
+
+                  <Stack direction="row" spacing={1}>
+                    <Chip size="small" label={`AUTO_OK ${autoOkCount}`} color="success" variant="outlined" />
+                    <Chip size="small" label={`REVIEW ${reviewCount}`} color="warning" variant="outlined" />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        if (!selectedDocument) return;
+                        setActiveRow({
+                          id: 0,
+                          document_id: selectedDocument.id,
+                          description_raw: '',
+                          extraction_confidence: 0,
+                          verification_confidence: 0,
+                          status: 'REVIEW',
+                          created_at: new Date().toISOString(),
+                        } as IndexRow);
+                        setIndexEditorOpen(true);
+                      }}
+                    >
+                      Add Row
+                    </Button>
+                  </Stack>
+                </Stack>
+
+                <Tabs
+                  value={leftTab}
+                  onChange={(_, value) => setLeftTab(value)}
+                  sx={{ minHeight: 40 }}
+                >
+                  <Tab value="index" label="Index Table" sx={{ textTransform: 'none', minHeight: 40 }} />
+                  <Tab
+                    value="chat"
+                    icon={<ChatRoundedIcon sx={{ fontSize: 18 }} />}
+                    iconPosition="start"
+                    label="Document Chat"
+                    sx={{ textTransform: 'none', minHeight: 40 }}
+                  />
+                </Tabs>
+              </Box>
+
+              <Divider />
+
+              <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0 }}>
+                {leftTab === 'index' ? (
+                  <IndexRowTable rows={indexRows} onJump={handleJump} onEdit={handleEdit} onDelete={handleDeleteRow} />
+                ) : (
+                  <ChatPanel
+                    documentId={selectedDocument?.id}
+                    onJumpToPage={(page) => {
+                      setPdfJumpTarget(page);
+                      setCurrentPdfPage(page);
+                    }}
+                  />
+                )}
+              </Box>
+            </Paper>
+          </Stack>
+
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              borderRadius: 3,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              height: { xs: '70vh', xl: 'calc(100vh - 120px)' }
+            }}
+          >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, pb: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <PictureAsPdfRoundedIcon fontSize="small" color="primary" />
+                <Typography fontWeight={700}>PDF preview</Typography>
+              </Stack>
+
+              {selectedDocument ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip size="small" label={selectedDocument.file_name} variant="outlined" />
+                  <Chip
+                    size="small"
+                    label={selectedDocument.status}
+                    color={statusTone(selectedDocument.status) as any}
+                  />
+                </Stack>
+              ) : null}
+            </Stack>
+
+            <Divider sx={{ mb: 1.5 }} />
+
+            <Box sx={{ flex: 1, minHeight: 0 }}>
+              <PdfViewerPanel
+                fileUrl={pdfUrl}
+                jumpPage={pdfJumpTarget}
+                currentPage={currentPdfPage}
+                onPageChange={setCurrentPdfPage}
+              />
+            </Box>
+          </Paper>
+        </Box>
+      </Container>
+
+      <IndexEditorDrawer
+        open={indexEditorOpen}
+        row={activeRow}
+        onClose={() => {
+          setIndexEditorOpen(false);
+          setActiveRow(null);
+        }}
+        onSave={handleSaveRow}
+      />
+
+      <OpsModal
+        open={opsOpen}
+        onClose={() => setOpsOpen(false)}
+        status={opsStatus}
+        activeQueue={activeQueue}
+        selectedDocumentId={selectedDocument?.id}
+        busy={opsBusy}
+        onStopSelected={handleStopSelected}
+        onRestartSelected={handleRestartSelected}
+        onClearPending={handleClearPendingQueue}
+        onStopDocument={handleStopDocumentFromQueue}
+      />
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.type}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
+
+      <Drawer
+        anchor="left"
+        open={mobileLibraryOpen}
+        onClose={() => setMobileLibraryOpen(false)}
+        sx={{ display: { xs: 'block', xl: 'none' } }}
+      >
+        <Box sx={{ width: 360, p: 2 }}>
+          <DocumentLibrary
+            documents={documents}
+            selectedDocumentId={selectedDocument?.id}
+            onSelect={(doc) => {
+              handleSelectDocument(doc);
+              setMobileLibraryOpen(false);
+            }}
+          />
+        </Box>
+      </Drawer>
+    </Box>
+  );
+}

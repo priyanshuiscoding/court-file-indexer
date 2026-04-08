@@ -1,0 +1,61 @@
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: court_postgres
+    environment:
+      POSTGRES_DB: court_indexer
+      POSTGRES_USER: court_user
+      POSTGRES_PASSWORD: court_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: court_redis
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: court_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  backend:
+    build:
+      context: ./backend
+    container_name: court_backend
+    env_file:
+      - ./backend/.env.example
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+    volumes:
+      - ./storage:/app/storage
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ./backend
+    container_name: court_worker
+    env_file:
+      - ./backend/.env.example
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+    volumes:
+      - ./storage:/app/storage
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO --concurrency=1
+
+volumes:
+  postgres_data:
+  qdrant_data:

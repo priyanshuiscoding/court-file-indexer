@@ -56,7 +56,7 @@ export default function IndexEditorDrawer({ open, row, onClose, onSave }: Props)
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose}>
+    <Drawer anchor="left" open={open} onClose={onClose}>
       <Box sx={{ width: 420, p: 3 }}>
         <Typography variant="h6" fontWeight={700} mb={2}>Edit Index Row</Typography>
         <Stack spacing={2}>

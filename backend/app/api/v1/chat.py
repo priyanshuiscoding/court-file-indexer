@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.config import get_settings
 from app.models.document import Document
 from app.services.document_chat_service import DocumentChatService
 from app.services.document_service import DocumentService
@@ -16,7 +17,7 @@ from app.services.vector_service import VectorService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-CHAT_REQUEST_TIMEOUT_SECONDS = 50
+settings = get_settings()
 
 document_service = DocumentService()
 chat_store = DocumentChatService()
@@ -76,10 +77,10 @@ def ask_chat(document_id: int, payload: ChatRequest, db: Session = Depends(get_d
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(rag.answer_question, document_id, question)
         try:
-            result = future.result(timeout=CHAT_REQUEST_TIMEOUT_SECONDS)
+            result = future.result(timeout=settings.CHAT_REQUEST_TIMEOUT_SECONDS)
         except FuturesTimeoutError:
             result = {
-                "answer": "Model is warming up. Please try the same question again in a minute.",
+                "answer": "Model is still generating. Please retry this question once after a few seconds.",
                 "sources": [],
             }
         finally:

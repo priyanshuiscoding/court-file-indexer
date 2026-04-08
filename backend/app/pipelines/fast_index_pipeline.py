@@ -71,6 +71,8 @@ class FastIndexPipeline:
                 "rows": 0,
                 "pages_used": len(ocr_pages),
                 "ok": False,
+                "index_pages": result.get("index_pages", []),
+                "debug_pages": (result.get("meta") or {}).get("debug_pages", []),
             }
 
         document.status = "INDEX_READY"
@@ -80,4 +82,6 @@ class FastIndexPipeline:
             "rows": row_count,
             "pages_used": len(ocr_pages),
             "ok": True,
+            "index_pages": result.get("index_pages", []),
+            "debug_pages": (result.get("meta") or {}).get("debug_pages", []),
         }

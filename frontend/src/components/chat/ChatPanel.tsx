@@ -15,6 +15,16 @@ type Props = {
   onJumpToPage?: (page: number) => void;
 };
 
+const STRUCTURED_SUMMARY_PROMPT =
+  'Give me a structured legal case summary with: case number, court/bench, location, petitioner/applicant, respondent, advocates, judge, key dates, sections/acts, compensation/fine amount, sentence/jail term, relief sought, final order/status, and source pages.';
+
+const QUICK_QUESTIONS = [
+  'What is the petitioner/applicant name?',
+  'What is the compensation or fine amount?',
+  'What is the sentence or jail term?',
+  'What are the sections/acts involved?',
+];
+
 function extractApiError(error: unknown, fallback: string): string {
   const anyErr = error as any;
   return anyErr?.response?.data?.detail || anyErr?.message || fallback;
@@ -73,6 +83,10 @@ export default function ChatPanel({ documentId, onJumpToPage }: Props) {
     }
   };
 
+  const injectPrompt = (value: string) => {
+    setQuestion(value);
+  };
+
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
       <Stack spacing={2}>
@@ -86,13 +100,33 @@ export default function ChatPanel({ documentId, onJumpToPage }: Props) {
 
         {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => injectPrompt(STRUCTURED_SUMMARY_PROMPT)}
+          >
+            Structured Summary
+          </Button>
+          {QUICK_QUESTIONS.map((q) => (
+            <Chip
+              key={q}
+              label={q}
+              size="small"
+              variant="outlined"
+              onClick={() => injectPrompt(q)}
+              sx={{ cursor: 'pointer' }}
+            />
+          ))}
+        </Stack>
+
         <TextField
           multiline
-          minRows={3}
+          minRows={4}
           label="Ask anything about this case file"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Example: Give me a short summary of the case file"
+          placeholder="Example: Give structured legal summary with petitioner, respondent, advocates, judge, sections, amount, sentence, final order"
         />
 
         <Button

@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     EMBEDDING_VECTOR_SIZE: int = 1024
     QDRANT_TOP_K: int = 8
     CHAT_CONTEXT_TOP_K: int = 6
+    CHAT_SUMMARY_CONTEXT_TOP_K: int = 12
     CHAT_MAX_HISTORY: int = 12
     CHAT_GENERATION_TIMEOUT_SECONDS: int = 45
+    CHAT_REQUEST_TIMEOUT_SECONDS: int = 70
 
     STORAGE_ROOT: str = "./storage"
     PDF_STORAGE_DIR: str = "./storage/pdfs"

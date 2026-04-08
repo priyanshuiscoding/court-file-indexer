@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import re
-from typing import List
+from collections import defaultdict
+from typing import Dict, List, Tuple
 
 from app.schemas.index_models import IndexRow
 
 
 BANNED_DESC_PATTERNS = [
     r"whether any bail application",
-    r"\bcase\s*no\b",
     r"\bresult\b",
     r"\bcourt\(s\)\b",
     r"\baccused application\b",
@@ -17,10 +17,6 @@ BANNED_DESC_PATTERNS = [
     r"\bparticular of crime\b",
     r"\bdate of arrest\b",
     r"\bpolice station\b",
-    r"\bsection\b",
-    r"\bversus\b",
-    r"\bapplicant\b",
-    r"\brespondent\b",
 ]
 
 HEADER_NOISE_PATTERNS = [
@@ -31,7 +27,7 @@ HEADER_NOISE_PATTERNS = [
 ]
 
 ANNEX_RE = re.compile(r"^[A-Z]+-\d{1,3}$")
-DESC_MIN_LEN = 4
+DESC_MIN_LEN = 3
 
 
 def normalize_desc(text: str) -> str:
@@ -69,6 +65,7 @@ def valid_annexure(value: str | None) -> bool:
 
 def valid_page_range(row: IndexRow, max_pdf_pages: int) -> bool:
     if row.page_start is None and row.page_end is None:
+        # First row "Index" may not have explicit pages.
         return row.row_no == 1
 
     if row.page_start is None or row.page_end is None:
@@ -104,27 +101,46 @@ def row_confidence_bonus(row: IndexRow) -> float:
     if row.row_no == 1 and "index" in desc:
         score += 0.10
 
-    if len(desc) >= 12:
+    if len(desc) >= 8:
         score += 0.05
 
     return min(score, 1.0)
 
 
-def validate_rows(rows: List[IndexRow], max_pdf_pages: int) -> List[IndexRow]:
+def _add_reason(stats: dict, reason: str) -> None:
+    drop_reasons = stats["drop_reasons"]
+    drop_reasons[reason] = int(drop_reasons.get(reason, 0)) + 1
+
+
+def _drop_with_reason(stats: dict, reason: str) -> None:
+    stats["dropped"] += 1
+    _add_reason(stats, reason)
+
+
+def validate_rows_with_debug(rows: List[IndexRow], max_pdf_pages: int) -> Tuple[List[IndexRow], Dict[int, dict]]:
     cleaned: List[IndexRow] = []
     seen = set()
 
+    stats_by_page: dict = defaultdict(lambda: {"parsed": 0, "dropped": 0, "drop_reasons": {}})
+
     for row in rows:
+        source_page = int(getattr(row, "source_page", 0) or 0)
+        stats = stats_by_page[source_page]
+        stats["parsed"] += 1
+
         row.description = normalize_desc(row.description)
         row.annexure = row.annexure.strip().upper() if row.annexure else None
 
         if row.row_no is None and not row.description:
+            _drop_with_reason(stats, "empty_row")
             continue
 
         if row.row_no is not None and row.row_no in seen:
+            _drop_with_reason(stats, "duplicate_row_no")
             continue
 
         if not valid_description(row.description):
+            _drop_with_reason(stats, "invalid_description")
             continue
 
         page_ok = valid_page_range(row, max_pdf_pages)
@@ -132,8 +148,15 @@ def validate_rows(rows: List[IndexRow], max_pdf_pages: int) -> List[IndexRow]:
 
         row.confidence = row_confidence_bonus(row)
 
-        if not page_ok or not annex_ok or row.confidence < 0.82:
+        if not page_ok:
             row.review_required = True
+            _add_reason(stats, "review_bad_page_range")
+        elif not annex_ok:
+            row.review_required = True
+            _add_reason(stats, "review_bad_annexure")
+        elif row.confidence < 0.78:
+            row.review_required = True
+            _add_reason(stats, "review_low_confidence")
         else:
             row.review_required = False
 
@@ -143,4 +166,11 @@ def validate_rows(rows: List[IndexRow], max_pdf_pages: int) -> List[IndexRow]:
         cleaned.append(row)
 
     cleaned.sort(key=lambda r: r.row_no or 9999)
+
+    debug = {int(k): v for k, v in sorted(stats_by_page.items(), key=lambda kv: kv[0])}
+    return cleaned, debug
+
+
+def validate_rows(rows: List[IndexRow], max_pdf_pages: int) -> List[IndexRow]:
+    cleaned, _ = validate_rows_with_debug(rows, max_pdf_pages=max_pdf_pages)
     return cleaned

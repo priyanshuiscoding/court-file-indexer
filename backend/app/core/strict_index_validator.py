@@ -27,13 +27,22 @@ HEADER_NOISE_PATTERNS = [
 ]
 
 ANNEX_RE = re.compile(r"^[A-Z]+-\d{1,3}$")
-DESC_MIN_LEN = 3
+ANNEX_ONLY_TOKEN_RE = re.compile(r"^[A-Z]+/?\d+$")
+DESC_MIN_LEN = 4
 
 
 def normalize_desc(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     text = re.sub(r"\s+([,.;:])", r"\1", text)
     return text
+
+
+def _is_annex_only_description(desc: str) -> bool:
+    tokens = [t for t in re.split(r"\s+", desc.upper()) if t]
+    if not tokens:
+        return False
+    # Reject rows where description is only annexure-like tokens (e.g. "A/1 A/2").
+    return all(ANNEX_ONLY_TOKEN_RE.match(t.replace("-", "")) for t in tokens)
 
 
 def valid_description(desc: str) -> bool:
@@ -43,6 +52,9 @@ def valid_description(desc: str) -> bool:
         return False
 
     if re.fullmatch(r"[\d\W]+", d):
+        return False
+
+    if _is_annex_only_description(d):
         return False
 
     for pat in HEADER_NOISE_PATTERNS:
@@ -101,7 +113,7 @@ def row_confidence_bonus(row: IndexRow) -> float:
     if row.row_no == 1 and "index" in desc:
         score += 0.10
 
-    if len(desc) >= 8:
+    if len(desc) >= 12:
         score += 0.05
 
     return min(score, 1.0)
@@ -154,7 +166,7 @@ def validate_rows_with_debug(rows: List[IndexRow], max_pdf_pages: int) -> Tuple[
         elif not annex_ok:
             row.review_required = True
             _add_reason(stats, "review_bad_annexure")
-        elif row.confidence < 0.78:
+        elif row.confidence < 0.82:
             row.review_required = True
             _add_reason(stats, "review_low_confidence")
         else:

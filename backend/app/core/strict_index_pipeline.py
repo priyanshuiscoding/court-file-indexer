@@ -57,7 +57,7 @@ def _continuation_signal(page: dict) -> int:
     lines = page.get("lines") or []
 
     signal = 0
-    if "annexure" in text or "ann" in text:
+    if "annexure" in text:
         signal += 1
     if "page no" in text or "pages" in text:
         signal += 1
@@ -114,16 +114,8 @@ def _detect_index_pages_structural(page_payloads: list[dict], min_score: int = 4
         if not sig:
             continue
 
-        # Slightly relaxed threshold for continuation pages.
-        if sig["score"] >= (min_score - 1) or sig["continuation"] >= 2:
+        if sig["score"] >= (min_score - 0.5) or sig["continuation"] >= 3:
             selected.append(nidx)
-
-    # If primary was not first index page but previous page still looks index-like, include it.
-    pidx = primary["idx"] - 1
-    if pidx >= 0 and len(selected) < 3:
-        prev_sig = next((s for s in page_signals if s["idx"] == pidx), None)
-        if prev_sig and (prev_sig["score"] >= min_score or prev_sig["continuation"] >= 2):
-            selected.append(pidx)
 
     selected = sorted(set(selected))[:3]
     return selected
@@ -138,8 +130,18 @@ def run_strict_index_pipeline(page_payloads: List[dict], max_pdf_pages: int) -> 
     index_pages = _detect_index_pages_structural(page_payloads)
     used_all_pages_fallback = False
     if not index_pages:
-        # Fallback: attempt extraction on all provided pages.
-        index_pages = list(range(len(page_payloads)))
+        # Conservative fallback: try top-scoring first pages rather than all pages.
+        candidates = [
+            {
+                "idx": i,
+                "score": score_index_page(page.get("text", "")),
+            }
+            for i, page in enumerate(page_payloads[:20])
+        ]
+        candidates = sorted(candidates, key=lambda x: x["score"], reverse=True)
+        index_pages = sorted([c["idx"] for c in candidates[:3] if c["score"] > 0])
+        if not index_pages:
+            index_pages = list(range(min(3, len(page_payloads))))
         used_all_pages_fallback = True
 
     extracted_rows = []
@@ -177,19 +179,11 @@ def run_strict_index_pipeline(page_payloads: List[dict], max_pdf_pages: int) -> 
         cols = detect_columns(lines_grouped)
 
         if cols is None:
-            # Fallback to full-page grouping for non-standard index layouts.
-            full_words = extract_ocr_words_from_lines(lines)
-            full_grouped = group_words_into_lines(full_words)
-            cols = detect_columns(full_grouped)
-            if cols is None:
-                base_debug["status"] = "header_not_found"
-                page_rows_debug[page_no] = base_debug
-                continue
+            base_debug["status"] = "header_not_found"
+            page_rows_debug[page_no] = base_debug
+            continue
 
-            base_debug["used_full_page_fallback"] = True
-            rows = rebuild_index_rows(full_grouped, cols, source_page=page_no)
-        else:
-            rows = rebuild_index_rows(lines_grouped, cols, source_page=page_no)
+        rows = rebuild_index_rows(lines_grouped, cols, source_page=page_no)
 
         extracted_rows.extend(rows)
         base_debug["rows_parsed"] = len(rows)

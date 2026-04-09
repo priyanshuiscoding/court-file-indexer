@@ -40,6 +40,13 @@ export default function IndexEditorDrawer({ open, row, onClose, onSave }: Props)
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const parseNullableInt = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   const handleSave = async () => {
     const payload: Partial<IndexRow> = {
       ...form,
@@ -60,11 +67,17 @@ export default function IndexEditorDrawer({ open, row, onClose, onSave }: Props)
       <Box sx={{ width: 420, p: 3 }}>
         <Typography variant="h6" fontWeight={700} mb={2}>Edit Index Row</Typography>
         <Stack spacing={2}>
+          <TextField
+            label="Serial No"
+            type="number"
+            value={form.row_no ?? ''}
+            onChange={(e) => updateField('row_no', parseNullableInt(e.target.value))}
+          />
           <TextField label="Description" multiline minRows={3} value={form.description_raw || ''} onChange={(e) => updateField('description_raw', e.target.value)} />
           <TextField label="Annexure No" value={form.annexure_no || ''} onChange={(e) => updateField('annexure_no', e.target.value)} />
           <Stack direction="row" spacing={2}>
-            <TextField label="Page From" type="number" fullWidth value={form.page_from || ''} onChange={(e) => updateField('page_from', Number(e.target.value) || null)} />
-            <TextField label="Page To" type="number" fullWidth value={form.page_to || ''} onChange={(e) => updateField('page_to', Number(e.target.value) || null)} />
+            <TextField label="Page From" type="number" fullWidth value={form.page_from ?? ''} onChange={(e) => updateField('page_from', parseNullableInt(e.target.value))} />
+            <TextField label="Page To" type="number" fullWidth value={form.page_to ?? ''} onChange={(e) => updateField('page_to', parseNullableInt(e.target.value))} />
           </Stack>
 
           <DocumentTypeSelector

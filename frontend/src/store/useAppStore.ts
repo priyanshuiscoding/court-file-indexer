@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import type { ChatMessage, DocumentItem, DocumentPage, IndexRow, OpsStatus } from '../types';
 
+const sortRows = (rows: IndexRow[]) =>
+  [...rows].sort((a, b) => {
+    const aRow = a.row_no ?? Number.MAX_SAFE_INTEGER;
+    const bRow = b.row_no ?? Number.MAX_SAFE_INTEGER;
+    if (aRow !== bRow) return aRow - bRow;
+    return a.id - b.id;
+  });
+
 type AppState = {
   documents: DocumentItem[];
   selectedDocument: DocumentItem | null;
@@ -53,7 +61,7 @@ export const useAppStore = create<AppState>((set) => ({
   loadingChat: false,
   setDocuments: (documents) => set({ documents }),
   setSelectedDocument: (selectedDocument) => set({ selectedDocument }),
-  setIndexRows: (indexRows) => set({ indexRows }),
+  setIndexRows: (indexRows) => set({ indexRows: sortRows(indexRows) }),
   setDocumentPages: (documentPages) => set({ documentPages }),
   setOpsStatus: (opsStatus) => set({ opsStatus }),
   setChatMessages: (chatMessages) => set({ chatMessages }),
@@ -70,8 +78,9 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => {
       const exists = state.indexRows.some((r) => r.id === row.id);
       if (exists) {
-        return { indexRows: state.indexRows.map((r) => (r.id === row.id ? row : r)) };
+        const updatedRows = state.indexRows.map((r) => (r.id === row.id ? row : r));
+        return { indexRows: sortRows(updatedRows) };
       }
-      return { indexRows: [...state.indexRows, row].sort((a, b) => (a.row_no || 9999) - (b.row_no || 9999)) };
+      return { indexRows: sortRows([...state.indexRows, row]) };
     })
 }));

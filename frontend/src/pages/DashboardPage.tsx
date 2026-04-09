@@ -414,6 +414,10 @@ export default function DashboardPage() {
 
   const reviewCount = indexRows.filter((r) => r.status === 'REVIEW').length;
   const autoOkCount = indexRows.filter((r) => r.status === 'AUTO_OK').length;
+  const nextRowNo = useMemo(() => {
+    if (indexRows.length === 0) return 1;
+    return Math.max(...indexRows.map((r) => r.row_no ?? 0)) + 1;
+  }, [indexRows]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f4f7fb' }}>
@@ -589,6 +593,7 @@ export default function DashboardPage() {
                         setActiveRow({
                           id: 0,
                           document_id: selectedDocument.id,
+                          row_no: nextRowNo,
                           description_raw: '',
                           extraction_confidence: 0,
                           verification_confidence: 0,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+ï»¿import { useEffect, useMemo, useState } from 'react';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
@@ -110,7 +110,7 @@ export default function DocumentLibrary({
 
             <ListItemText
               primary={doc.cnr_number || doc.file_name}
-              secondary={`${formatText(doc.batch_no)} • ${doc.page_count} pages • ${formatDateTime(doc.created_at)}`}
+              secondary={`${formatText(doc.batch_no)} - ${doc.page_count} pages - ${formatDateTime(doc.created_at)}`}
               primaryTypographyProps={{ fontWeight: 700, fontSize: 14 }}
               secondaryTypographyProps={{ fontSize: 12 }}
             />

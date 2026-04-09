@@ -24,7 +24,21 @@ services:
       - ./storage:/app/storage
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
-    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO --concurrency=1
+    command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
+    shm_size: "8gb"
+
+  worker_fast:
+    gpus: all
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      TRANSFORMERS_CACHE: /root/.cache/huggingface
+      CUDA_VISIBLE_DEVICES: "0"
+      APP_ENV: production
+    volumes:
+      - ./storage:/app/storage
+      - hf_cache:/root/.cache/huggingface
+      - torch_cache:/root/.cache/torch
+    command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
     shm_size: "8gb"
 
 volumes:

@@ -54,7 +54,21 @@ services:
       - qdrant
     volumes:
       - ./storage:/app/storage
-    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO --concurrency=1
+    command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
+
+  worker_fast:
+    build:
+      context: ./backend
+    container_name: court_worker_fast
+    env_file:
+      - ./backend/.env.example
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+    volumes:
+      - ./storage:/app/storage
+    command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
 
 volumes:
   postgres_data:

@@ -26,7 +26,7 @@ import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 
 import { BACKEND_BASE_URL } from '../api/client';
-import { getDocument, listDocuments, uploadDocument, uploadDocumentBatch } from '../api/documents';
+import { deleteDocument, deleteDocumentsBulk, getDocument, listDocuments, uploadDocument, uploadDocumentBatch } from '../api/documents';
 import { createIndexRow, deleteIndexRow, getIndexRows, manualScan, startIndexing, updateIndexRow } from '../api/indexing';
 import { clearPendingQueue, getActiveQueue, getOpsStatus, restartDocumentProcessing, stopDocumentProcessing } from '../api/ops';
 import { getDocumentPages } from '../api/pages';
@@ -264,6 +264,47 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteSingleDocument = async (document: DocumentItem) => {
+    const confirmed = window.confirm(`Delete ${document.file_name}? This will remove indexed rows, chat history, and vectors for this PDF.`);
+    if (!confirmed) return;
+
+    setActionBusy(true);
+    try {
+      await deleteDocument(document.id);
+      const keepId = selectedDocumentId === document.id ? undefined : selectedDocumentId;
+      await refreshAll(keepId);
+      showToast('success', 'PDF deleted successfully.');
+    } catch (error) {
+      showToast('error', extractApiError(error, 'Failed to delete PDF.'));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleDeleteMultipleDocuments = async (documentIds: number[]) => {
+    if (documentIds.length === 0) return;
+    const confirmed = window.confirm(`Delete ${documentIds.length} selected PDF(s)? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setActionBusy(true);
+    try {
+      const result = await deleteDocumentsBulk(documentIds);
+      const selectedDeleted = selectedDocumentId != null && result.deleted_document_ids.includes(selectedDocumentId);
+      await refreshAll(selectedDeleted ? undefined : selectedDocumentId);
+
+      const activeCount = result.active_document_ids.length;
+      if (activeCount > 0) {
+        showToast('info', `Deleted ${result.deleted_count} PDF(s). ${activeCount} active PDF(s) were skipped.`);
+      } else {
+        showToast('success', `Deleted ${result.deleted_count} PDF(s).`);
+      }
+    } catch (error) {
+      showToast('error', extractApiError(error, 'Failed to delete selected PDFs.'));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const handleSearch = async (params: { cnr?: string; batch_no?: string }) => {
     setLoadingPage(true);
     try {
@@ -355,6 +396,31 @@ export default function DashboardPage() {
       showToast('success', 'Row deleted.');
     } catch {
       showToast('error', 'Failed to delete row.');
+    }
+  };
+
+  const handleReorderRows = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    const reordered = [...indexRows];
+    const [movedRow] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, movedRow);
+
+    const previousRowNoById = new Map(indexRows.map((row) => [row.id, row.row_no]));
+    const normalizedRows = reordered.map((row, index) => ({ ...row, row_no: index + 1 }));
+
+    setIndexRows(normalizedRows);
+
+    try {
+      const changedRows = normalizedRows.filter((row) => previousRowNoById.get(row.id) !== row.row_no);
+      await Promise.all(changedRows.map((row) => updateIndexRow(row.id, { row_no: row.row_no })));
+      showToast('success', 'Index row order updated.');
+    } catch {
+      showToast('error', 'Failed to persist row order. Reloading latest rows.');
+      if (selectedDocument) {
+        const freshRows = await getIndexRows(selectedDocument.id);
+        setIndexRows(freshRows);
+      }
     }
   };
 
@@ -544,6 +610,9 @@ export default function DashboardPage() {
                       documents={documents}
                       selectedDocumentId={selectedDocument?.id}
                       onSelect={handleSelectDocument}
+                      onDeleteSingle={handleDeleteSingleDocument}
+                      onDeleteMultiple={handleDeleteMultipleDocuments}
+                      deleting={actionBusy}
                     />
                   </Stack>
                 </Box>
@@ -628,7 +697,7 @@ export default function DashboardPage() {
 
               <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0 }}>
                 {leftTab === 'index' ? (
-                  <IndexRowTable rows={indexRows} onJump={handleJump} onEdit={handleEdit} onDelete={handleDeleteRow} />
+                  <IndexRowTable rows={indexRows} onJump={handleJump} onEdit={handleEdit} onDelete={handleDeleteRow} onReorder={handleReorderRows} />
                 ) : (
                   <ChatPanel
                     documentId={selectedDocument?.id}
@@ -738,9 +807,17 @@ export default function DashboardPage() {
               handleSelectDocument(doc);
               setMobileLibraryOpen(false);
             }}
+            onDeleteSingle={handleDeleteSingleDocument}
+            onDeleteMultiple={handleDeleteMultipleDocuments}
+            deleting={actionBusy}
           />
         </Box>
       </Drawer>
     </Box>
   );
 }
+
+
+
+
+

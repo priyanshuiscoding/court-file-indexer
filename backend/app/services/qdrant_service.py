@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
@@ -36,3 +36,15 @@ class QdrantService:
             ),
             limit=top_k,
         )
+
+    def delete_document_points(self, document_id: int) -> None:
+        # Best-effort cleanup. If Qdrant is temporarily unavailable, DB deletion should still proceed.
+        try:
+            self.client.delete(
+                collection_name=self.collection,
+                points_selector=Filter(
+                    must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+                ),
+            )
+        except Exception:
+            return

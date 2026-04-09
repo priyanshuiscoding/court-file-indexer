@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
@@ -17,13 +18,35 @@ type Props = {
   onJump: (pageNo: number) => void;
   onEdit: (row: IndexRow) => void;
   onDelete?: (row: IndexRow) => void;
+  onReorder: (fromIndex: number, toIndex: number) => Promise<void>;
 };
 
 function statusColor(status: string) {
   return status === 'REVIEW' ? 'warning' : 'success';
 }
 
-export default function IndexRowTable({ rows, onJump, onEdit, onDelete }: Props) {
+export default function IndexRowTable({ rows, onJump, onEdit, onDelete, onReorder }: Props) {
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const clearDragState = () => {
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (targetIndex: number) => {
+    if (dragSourceIndex == null || dragSourceIndex === targetIndex) {
+      clearDragState();
+      return;
+    }
+
+    try {
+      await onReorder(dragSourceIndex, targetIndex);
+    } finally {
+      clearDragState();
+    }
+  };
+
   return (
     <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, maxHeight: 560 }}>
       <Table stickyHeader size="small">
@@ -49,20 +72,43 @@ export default function IndexRowTable({ rows, onJump, onEdit, onDelete }: Props)
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row) => {
+            rows.map((row, index) => {
               const pageLabel =
                 row.page_from != null
                   ? `${row.page_from}${row.page_to != null ? `-${row.page_to}` : ''}`
                   : '-';
 
               const jumpPage = row.page_from || row.source_page_no || 1;
+              const isDragOver = dragOverIndex === index && dragSourceIndex !== index;
 
               return (
                 <TableRow
                   key={row.id}
                   hover
+                  draggable
+                  onDragStart={(event) => {
+                    setDragSourceIndex(index);
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', String(index));
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (dragSourceIndex !== index) {
+                      setDragOverIndex(index);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    void handleDrop(index);
+                  }}
+                  onDragEnd={clearDragState}
                   onClick={() => onJump(jumpPage)}
-                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f8fbff' } }}
+                  sx={{
+                    cursor: 'grab',
+                    '&:hover': { bgcolor: '#f8fbff' },
+                    bgcolor: isDragOver ? '#e8f0ff' : undefined,
+                    outline: isDragOver ? '1px dashed #2f6bff' : 'none',
+                  }}
                 >
                   <TableCell>{row.row_no || '-'}</TableCell>
 

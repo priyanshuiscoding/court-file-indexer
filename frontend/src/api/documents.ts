@@ -34,3 +34,19 @@ export async function uploadDocumentBatch(files: File[], batchNo?: string) {
   });
   return data;
 }
+
+export async function deleteDocument(documentId: number) {
+  const { data } = await api.delete<{ ok: boolean; deleted_document_id: number }>(`/documents/${documentId}`);
+  return data;
+}
+
+export async function deleteDocumentsBulk(documentIds: number[]) {
+  const { data } = await api.post<{
+    ok: boolean;
+    deleted_count: number;
+    deleted_document_ids: number[];
+    active_document_ids: number[];
+    not_found_document_ids: number[];
+  }>('/documents/delete-bulk', { document_ids: documentIds });
+  return data;
+}

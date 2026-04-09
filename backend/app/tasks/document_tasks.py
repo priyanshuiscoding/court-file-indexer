@@ -229,7 +229,7 @@ def full_process(self, document_id: int):
         doc = DocumentService().get_document(db, document_id)
         if not doc:
             queue_service.mark_terminal(db, self.request.id, "FAILED")
-            return {"ok": False, "error": "Document not found"}
+            return {"ok": False, "error": "Document not found"} 
 
         if doc.status in {"STOPPED", "CANCELLED"}:
             queue_service.mark_terminal(db, self.request.id, "CANCELLED")

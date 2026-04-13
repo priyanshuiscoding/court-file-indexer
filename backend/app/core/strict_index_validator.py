@@ -17,13 +17,27 @@ BANNED_DESC_PATTERNS = [
     r"\bparticular of crime\b",
     r"\bdate of arrest\b",
     r"\bpolice station\b",
+    r"\bcounsel\b",
+    r"\badvocate\b",
+    r"\bdeclaration\b",
+    r"\breceived\b",
+    r"\bclerk\b",
+    r"\bplace\b",
 ]
 
 HEADER_NOISE_PATTERNS = [
     r"particulars of document",
-    r"annexures",
-    r"page nos",
+    r"description of document",
+    r"description of documents",
+    r"\bparticulars\b",
+    r"\bdescription\b",
+    r"\bannexures?\b",
+    r"\bann\.\b",
+    r"\bpage nos?\b",
+    r"\bremarks\b",
     r"\bs\.?no\b",
+    r"\bsr\.?no\b",
+    r"\bsl\.?no\b",
 ]
 
 ANNEX_RE = re.compile(r"^[A-Z]+-\d{1,3}$")
@@ -41,7 +55,6 @@ def _is_annex_only_description(desc: str) -> bool:
     tokens = [t for t in re.split(r"\s+", desc.upper()) if t]
     if not tokens:
         return False
-    # Reject rows where description is only annexure-like tokens (e.g. "A/1 A/2").
     return all(ANNEX_ONLY_TOKEN_RE.match(t.replace("-", "")) for t in tokens)
 
 

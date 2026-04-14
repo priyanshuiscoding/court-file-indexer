@@ -108,7 +108,7 @@ export default function DashboardPage() {
 
   const selectedDocumentId = selectedDocument?.id;
 
-  useDocumentPolling(selectedDocumentId);
+  useDocumentPolling(selectedDocumentId, selectedDocument?.status);
 
   const selectedDocActiveJobs = useMemo(
     () =>
@@ -611,71 +611,83 @@ export default function DashboardPage() {
             overflow: { xl: 'hidden' }
           }}
         >
-          <Stack
-            spacing={2}
+          <Box
             sx={{
               minWidth: 0,
               height: { xl: 'calc(100vh - 120px)' },
+              display: 'grid',
+              gridTemplateRows: { xs: 'auto auto', xl: 'minmax(0, 46%) minmax(0, 54%)' },
+              gap: 2,
               overflow: { xl: 'hidden' }
             }}
           >
-            <Box
+            <Paper
+              variant="outlined"
               sx={{
                 minHeight: 0,
+                borderRadius: 3,
+                p: 2,
                 overflowY: { xl: 'auto' },
-                pr: { xl: 1 },
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2
+                display: 'grid',
+                gap: 2,
+                gridTemplateRows: 'auto auto',
               }}
             >
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', lg: '380px minmax(0, 1fr)' },
-                    gap: 2
-                  }}
-                >
-                  <Box>
-                    <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-                      <UploadFileRoundedIcon fontSize="small" color="primary" />
-                      <Typography fontWeight={700}>Upload PDF</Typography>
-                    </Stack>
-                    <UploadPanel onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
-                  </Box>
-
-                  <Stack spacing={2} minWidth={0}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <SearchRoundedIcon fontSize="small" color="primary" />
-                      <Typography fontWeight={700}>Search and library</Typography>
-                    </Stack>
-
-                    <SearchBar onSearch={handleSearch} />
-
-                    <DocumentLibrary
-                      documents={documents}
-                      selectedDocumentId={selectedDocument?.id}
-                      onSelect={handleSelectDocument}
-                      onDeleteSingle={handleDeleteSingleDocument}
-                      onDeleteMultiple={handleDeleteMultipleDocuments}
-                      deleting={actionBusy}
-                    />
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', lg: '360px minmax(0, 1fr)' },
+                  gap: 2
+                }}
+              >
+                <Box>
+                  <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                    <UploadFileRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Upload PDF</Typography>
                   </Stack>
+                  <UploadPanel onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
                 </Box>
-              </Paper>
 
-              <DocumentDetailsPanel document={selectedDocument} />
+                <Stack spacing={2} minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <SearchRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Search and library</Typography>
+                  </Stack>
 
-              <ManualScanPanel
-                disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
-                disabledReason={indexStartDisabledReason}
-                onStartDefault={handleStartDefault}
-                onManualScan={handleManualScan}
-              />
+                  <SearchBar onSearch={handleSearch} />
 
-              <ReviewSummary rows={indexRows} />
-            </Box>
+                  <DocumentLibrary
+                    documents={documents}
+                    selectedDocumentId={selectedDocument?.id}
+                    onSelect={handleSelectDocument}
+                    onDeleteSingle={handleDeleteSingleDocument}
+                    onDeleteMultiple={handleDeleteMultipleDocuments}
+                    deleting={actionBusy}
+                  />
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' },
+                  gap: 2,
+                  alignItems: 'stretch'
+                }}
+              >
+                <DocumentDetailsPanel document={selectedDocument} />
+
+                <Stack spacing={2}>
+                  <ManualScanPanel
+                    disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
+                    disabledReason={indexStartDisabledReason}
+                    onStartDefault={handleStartDefault}
+                    onManualScan={handleManualScan}
+                  />
+                  <ReviewSummary rows={indexRows} />
+                </Stack>
+              </Box>
+            </Paper>
 
             <Paper
               variant="outlined"
@@ -684,11 +696,9 @@ export default function DashboardPage() {
                 borderRadius: 3,
                 overflow: 'hidden',
                 bgcolor: 'background.paper',
-                minHeight: { xl: '42vh' },
-                maxHeight: { xl: '52vh' },
                 display: 'flex',
                 flexDirection: 'column',
-                flexShrink: 0
+                minHeight: 0
               }}
             >
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
@@ -756,7 +766,7 @@ export default function DashboardPage() {
                 )}
               </Box>
             </Paper>
-          </Stack>
+          </Box>
 
           <Paper
             variant="outlined"

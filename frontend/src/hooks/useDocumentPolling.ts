@@ -4,7 +4,17 @@ import { getIndexRows } from '../api/indexing';
 import { getDocumentPages } from '../api/pages';
 import { useAppStore } from '../store/useAppStore';
 
-export function useDocumentPolling(documentId?: number) {
+const ACTIVE_DOC_STATUSES = new Set([
+  'UPLOADED',
+  'OCR_RUNNING',
+  'INDEX_SEARCH_RUNNING',
+  'VECTORIZING',
+  'VERIFYING',
+  'FAST_INDEX_RUNNING',
+  'INDEX_READY',
+]);
+
+export function useDocumentPolling(documentId?: number, documentStatus?: string) {
   const setSelectedDocument = useAppStore((s) => s.setSelectedDocument);
   const setIndexRows = useAppStore((s) => s.setIndexRows);
   const setDocumentPages = useAppStore((s) => s.setDocumentPages);
@@ -31,11 +41,17 @@ export function useDocumentPolling(documentId?: number) {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const normalizedStatus = (documentStatus || '').toUpperCase();
+    const pollMs = ACTIVE_DOC_STATUSES.has(normalizedStatus) ? 5000 : 15000;
+    const interval = setInterval(() => {
+      // Avoid hammering API and UI rerenders when tab is not visible.
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData();
+    }, pollMs);
 
     return () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, [documentId, setSelectedDocument, setIndexRows, setDocumentPages]);
+  }, [documentId, documentStatus, setSelectedDocument, setIndexRows, setDocumentPages]);
 }

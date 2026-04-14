@@ -22,6 +22,7 @@ type Props = {
   onDeleteSingle: (document: DocumentItem) => Promise<void>;
   onDeleteMultiple: (documentIds: number[]) => Promise<void>;
   deleting?: boolean;
+  height?: number | string;
 };
 
 export default function DocumentLibrary({
@@ -31,6 +32,7 @@ export default function DocumentLibrary({
   onDeleteSingle,
   onDeleteMultiple,
   deleting = false,
+  height = 340,
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -59,8 +61,17 @@ export default function DocumentLibrary({
     setSelectedIds([]);
   };
 
+  const statusBg = (status?: string) => {
+    const s = (status || '').toUpperCase();
+    if (s.includes('FAILED')) return '#fff1f2';
+    if (s.includes('CHAT_READY') || s.includes('COMPLETED')) return '#effaf3';
+    if (s.includes('INDEX_READY') || s.includes('INDEX_PARSED')) return '#eef4ff';
+    if (s.includes('RUNNING') || s.includes('OCR') || s.includes('VECTORIZING')) return '#f7f8fc';
+    return '#ffffff';
+  };
+
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', height: 340 }}>
+    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', height }}>
       <Stack
         direction="row"
         justifyContent="space-between"
@@ -95,6 +106,7 @@ export default function DocumentLibrary({
             sx={{
               alignItems: 'flex-start',
               py: 1.25,
+              bgcolor: statusBg(doc.status),
               '&.Mui-selected': {
                 bgcolor: '#eef5ff'
               }

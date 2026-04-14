@@ -8,9 +8,10 @@ import Typography from '@mui/material/Typography';
 type Props = {
   onUpload: (file: File, cnr?: string, batchNo?: string) => Promise<void>;
   onBatchUpload?: (files: File[], batchNo?: string) => Promise<void>;
+  compact?: boolean;
 };
 
-export default function UploadPanel({ onUpload, onBatchUpload }: Props) {
+export default function UploadPanel({ onUpload, onBatchUpload, compact = false }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [cnr, setCnr] = useState('');
@@ -42,13 +43,19 @@ export default function UploadPanel({ onUpload, onBatchUpload }: Props) {
     }
   };
 
-  return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-      <Typography variant="subtitle1" fontWeight={800} mb={1.5}>
-        Upload PDF
-      </Typography>
-
-      <Stack spacing={1.5}>
+  const content = (
+    <Stack spacing={compact ? 1 : 1.5}>
+      {!compact ? (
+        <Typography variant="subtitle1" fontWeight={800} mb={0.5}>
+          Upload PDF
+        </Typography>
+      ) : null}
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+        flexWrap="wrap"
+      >
         <Button variant="outlined" component="label" sx={{ textTransform: 'none', borderRadius: 2 }}>
           {file ? file.name : 'Choose PDF'}
           <input
@@ -64,6 +71,7 @@ export default function UploadPanel({ onUpload, onBatchUpload }: Props) {
           size="small"
           value={cnr}
           onChange={(e) => setCnr(e.target.value)}
+          sx={{ minWidth: 160 }}
         />
 
         <TextField
@@ -71,7 +79,8 @@ export default function UploadPanel({ onUpload, onBatchUpload }: Props) {
           size="small"
           value={batchNo}
           onChange={(e) => setBatchNo(e.target.value)}
-          helperText="Optional for batch upload. If empty, system will auto-generate one."
+          helperText={compact ? undefined : "Optional for batch upload. If empty, system will auto-generate one."}
+          sx={{ minWidth: 140 }}
         />
 
         <Button
@@ -106,6 +115,21 @@ export default function UploadPanel({ onUpload, onBatchUpload }: Props) {
           </>
         ) : null}
       </Stack>
+      {!compact ? (
+        <Typography variant="caption" color="text.secondary">
+          Optional batch number groups uploads under one batch.
+        </Typography>
+      ) : null}
+    </Stack>
+  );
+
+  if (compact) {
+    return content;
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+      {content}
     </Paper>
   );
 }

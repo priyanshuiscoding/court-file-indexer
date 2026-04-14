@@ -11,7 +11,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { IndexRow } from '../../types';
-import { formatPercent, formatText } from '../../utils/format';
+import { formatText } from '../../utils/format';
 
 type Props = {
   rows: IndexRow[];
@@ -57,8 +57,6 @@ export default function IndexRowTable({ rows, onJump, onEdit, onDelete, onReorde
             <TableCell>Annexure</TableCell>
             <TableCell>Pages</TableCell>
             <TableCell>Mapped Type</TableCell>
-            <TableCell>Ext</TableCell>
-            <TableCell>Ver</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Action</TableCell>
           </TableRow>
@@ -67,7 +65,7 @@ export default function IndexRowTable({ rows, onJump, onEdit, onDelete, onReorde
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9}>
+              <TableCell colSpan={7}>
                 <Typography color="text.secondary">No index rows available yet.</Typography>
               </TableCell>
             </TableRow>
@@ -123,8 +121,6 @@ export default function IndexRowTable({ rows, onJump, onEdit, onDelete, onReorde
                   <TableCell>{formatText(row.annexure_no)}</TableCell>
                   <TableCell>{pageLabel}</TableCell>
                   <TableCell>{formatText(row.mapped_document_type)}</TableCell>
-                  <TableCell>{formatPercent(row.extraction_confidence)}</TableCell>
-                  <TableCell>{formatPercent(row.verification_confidence)}</TableCell>
 
                   <TableCell>
                     <Chip

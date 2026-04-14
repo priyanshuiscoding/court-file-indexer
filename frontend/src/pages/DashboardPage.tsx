@@ -627,35 +627,51 @@ export default function DashboardPage() {
                 minHeight: 0,
                 borderRadius: 3,
                 p: 2,
-                overflowY: { xl: 'auto' },
+                overflow: 'hidden',
                 display: 'grid',
                 gap: 2,
-                gridTemplateRows: 'auto auto',
+                gridTemplateRows: 'auto minmax(0, 1fr)',
               }}
             >
               <Box
                 sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: '1px solid #e5e7eb',
+                  bgcolor: '#f8fafc',
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', lg: '360px minmax(0, 1fr)' },
-                  gap: 2
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) auto' },
+                  gap: 1.5,
+                  alignItems: 'center'
                 }}
               >
-                <Box>
-                  <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-                    <UploadFileRoundedIcon fontSize="small" color="primary" />
-                    <Typography fontWeight={700}>Upload PDF</Typography>
-                  </Stack>
-                  <UploadPanel onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
-                </Box>
-
-                <Stack spacing={2} minWidth={0}>
+                <Stack spacing={1} minWidth={0}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <SearchRoundedIcon fontSize="small" color="primary" />
-                    <Typography fontWeight={700}>Search and library</Typography>
+                    <Typography fontWeight={700}>PDF Search</Typography>
                   </Stack>
-
                   <SearchBar onSearch={handleSearch} />
+                </Stack>
 
+                <Stack spacing={1} minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <UploadFileRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Upload</Typography>
+                  </Stack>
+                  <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.35fr) minmax(0, 1fr)' },
+                  gap: 2,
+                  alignItems: 'stretch',
+                  minHeight: 0,
+                }}
+              >
+                <Stack sx={{ minHeight: 0 }}>
                   <DocumentLibrary
                     documents={documents}
                     selectedDocumentId={selectedDocument?.id}
@@ -663,19 +679,9 @@ export default function DashboardPage() {
                     onDeleteSingle={handleDeleteSingleDocument}
                     onDeleteMultiple={handleDeleteMultipleDocuments}
                     deleting={actionBusy}
+                    height="100%"
                   />
                 </Stack>
-              </Box>
-
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' },
-                  gap: 2,
-                  alignItems: 'stretch'
-                }}
-              >
-                <DocumentDetailsPanel document={selectedDocument} />
 
                 <Stack spacing={2}>
                   <ManualScanPanel
@@ -685,6 +691,7 @@ export default function DashboardPage() {
                     onManualScan={handleManualScan}
                   />
                   <ReviewSummary rows={indexRows} />
+                  <DocumentDetailsPanel document={selectedDocument} />
                 </Stack>
               </Box>
             </Paper>

@@ -25,3 +25,8 @@ export async function clearPendingQueue() {
   const { data } = await api.post<QueueActionResult>('/ops/queue/clear-pending');
   return data;
 }
+
+export async function recoverStaleQueue() {
+  const { data } = await api.post<QueueActionResult>('/ops/queue/recover-stale');
+  return data;
+}

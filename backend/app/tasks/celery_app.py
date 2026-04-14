@@ -24,5 +24,13 @@ celery_app.conf.task_default_queue = FULL_PROCESS_QUEUE
 celery_app.conf.task_routes = {
     "document.fast_index": {"queue": FAST_INDEX_QUEUE},
     "document.full_process": {"queue": FULL_PROCESS_QUEUE},
+    "queue.monitor_and_recover": {"queue": FAST_INDEX_QUEUE},
     "ops.ping": {"queue": FAST_INDEX_QUEUE},
+}
+
+celery_app.conf.beat_schedule = {
+    "queue-monitor-and-recover-every-minute": {
+        "task": "queue.monitor_and_recover",
+        "schedule": 60.0,
+    },
 }

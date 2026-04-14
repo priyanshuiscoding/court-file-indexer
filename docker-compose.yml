@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:16
@@ -69,6 +68,20 @@ services:
     volumes:
       - ./storage:/app/storage
     command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
+
+  worker_beat:
+    build:
+      context: ./backend
+    container_name: court_worker_beat
+    env_file:
+      - ./backend/.env.example
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+    volumes:
+      - ./storage:/app/storage
+    command: celery -A app.tasks.celery_app.celery_app beat --loglevel=INFO
 
 volumes:
   postgres_data:

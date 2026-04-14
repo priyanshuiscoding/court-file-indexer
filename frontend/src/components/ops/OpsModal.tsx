@@ -20,6 +20,7 @@ type Props = {
   busy?: boolean;
   onStopSelected: () => void;
   onRestartSelected: () => void;
+  onRecoverStale: () => void;
   onClearPending: () => void;
   onStopDocument: (documentId: number) => void;
 };
@@ -57,6 +58,7 @@ export default function OpsModal({
   busy,
   onStopSelected,
   onRestartSelected,
+  onRecoverStale,
   onClearPending,
   onStopDocument,
 }: Props) {
@@ -78,6 +80,9 @@ export default function OpsModal({
           </Button>
           <Button variant="outlined" disabled={!selectedDocumentId || busy} onClick={onRestartSelected}>
             Restart Selected
+          </Button>
+          <Button variant="outlined" color="info" disabled={busy} onClick={onRecoverStale}>
+            Recover Stale
           </Button>
           <Button variant="outlined" color="warning" disabled={busy} onClick={onClearPending}>
             Clear Pending Queue

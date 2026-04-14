@@ -88,6 +88,36 @@ class QueueService:
         )
         return list(db.scalars(stmt).all())
 
+    def list_stale_active(self, db: Session, stale_seconds: int) -> list[QueueItem]:
+        now = datetime.utcnow()
+        threshold = now - timedelta(seconds=stale_seconds)
+
+        stmt = (
+            select(QueueItem)
+            .where(
+                and_(
+                    QueueItem.status.in_(ACTIVE_STATUSES),
+                    (
+                        (QueueItem.heartbeat_at.is_(None))
+                        | (QueueItem.heartbeat_at <= threshold)
+                    ),
+                )
+            )
+            .order_by(QueueItem.created_at.asc())
+        )
+        return list(db.scalars(stmt).all())
+
+    def count_attempts_for_document_queue(self, db: Session, document_id: int, queue_name: str) -> int:
+        stmt = (
+            select(QueueItem)
+            .where(
+                QueueItem.document_id == document_id,
+                QueueItem.queue_name == queue_name,
+            )
+            .order_by(QueueItem.created_at.asc())
+        )
+        return len(list(db.scalars(stmt).all()))
+
     def mark_cancelled_for_document(self, db: Session, document_id: int) -> list[QueueItem]:
         rows = self.active_for_document(db, document_id)
         now = datetime.utcnow()

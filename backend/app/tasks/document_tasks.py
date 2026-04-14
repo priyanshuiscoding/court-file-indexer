@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+import threading
+import time
+
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.document import Document
+from app.models.queue_item import QueueItem
 from app.pipelines.fast_index_pipeline import FastIndexPipeline
 from app.pipelines.ocr_pipeline import OCRPipeline
 from app.pipelines.vector_pipeline import VectorPipeline
@@ -10,10 +17,49 @@ from app.services.document_service import DocumentService
 from app.services.queue_service import QueueService
 from app.tasks.celery_app import celery_app
 
+settings = get_settings()
 queue_service = QueueService()
 
 # INDEX_READY is an intermediate fast-stage status, not terminal.
 TERMINAL_DOC_STATUSES = {"CHAT_READY", "COMPLETED", "APPROVED", "REVIEW_REQUIRED"}
+
+HEARTBEAT_TOUCH_SECONDS = max(15, min(30, int(settings.TASK_HEARTBEAT_SECONDS or 30)))
+QUEUE_STALE_SECONDS = {
+    "FAST_INDEX": 300,   # 5 min without heartbeat
+    "FULL_PROCESS": 900, # 15 min without heartbeat
+}
+QUEUE_MAX_ATTEMPTS = {
+    "FAST_INDEX": 2,
+    "FULL_PROCESS": 2,
+}
+
+
+class _QueueHeartbeat:
+    def __init__(self, task_id: str, interval_seconds: int = HEARTBEAT_TOUCH_SECONDS) -> None:
+        self.task_id = task_id
+        self.interval_seconds = max(10, interval_seconds)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def __enter__(self):
+        def _runner():
+            while not self._stop.wait(self.interval_seconds):
+                db = SessionLocal()
+                try:
+                    queue_service.touch(db, self.task_id)
+                except Exception:
+                    pass
+                finally:
+                    db.close()
+
+        self._thread = threading.Thread(target=_runner, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=2)
 
 
 def _has_active_fast_index(db) -> bool:
@@ -50,7 +96,6 @@ def _enqueue_full_task(db, document_id: int):
 
 
 def _pick_next_fast_candidate(db, preferred_batch: str | None = None) -> Document | None:
-    # Prefer same batch to keep uploads moving predictably.
     if preferred_batch:
         stmt = (
             select(Document)
@@ -61,7 +106,6 @@ def _pick_next_fast_candidate(db, preferred_batch: str | None = None) -> Documen
             if not _has_active_for_document(db, doc.id):
                 return doc
 
-    # Fallback: any queued document.
     stmt = select(Document).where(Document.status == "UPLOADED").order_by(Document.created_at.asc())
     for doc in db.scalars(stmt).all():
         if not _has_active_for_document(db, doc.id):
@@ -91,7 +135,6 @@ def _batch_has_pending_fast_candidates(db, batch_no: str) -> bool:
 
 
 def _enqueue_batch_full_process_when_ready(db, batch_no: str) -> int:
-    # Delay FULL_PROCESS until FAST queue is drained.
     if _has_active_fast_index(db):
         return 0
 
@@ -112,6 +155,109 @@ def _enqueue_batch_full_process_when_ready(db, batch_no: str) -> int:
     return queued
 
 
+def _revoke_worker_task(task_id: str | None, terminate: bool = True) -> None:
+    if not task_id:
+        return
+    try:
+        celery_app.control.revoke(task_id, terminate=terminate)
+    except Exception:
+        pass
+
+
+def _recover_stale_row(db, row: QueueItem) -> dict:
+    doc = DocumentService().get_document(db, row.document_id)
+    queue_name = row.queue_name
+    attempt_count = queue_service.count_attempts_for_document_queue(db, row.document_id, queue_name)
+    max_attempts = QUEUE_MAX_ATTEMPTS.get(queue_name, 1)
+
+    _revoke_worker_task(row.worker_id, terminate=True)
+    queue_service.mark_terminal(db, row.worker_id, "FAILED")
+
+    if not doc:
+        return {
+            "document_id": row.document_id,
+            "queue_name": queue_name,
+            "action": "marked_failed_missing_document",
+        }
+
+    if doc.status in {"STOPPED", "CANCELLED"}:
+        return {
+            "document_id": row.document_id,
+            "queue_name": queue_name,
+            "action": "ignored_stopped_document",
+        }
+
+    if queue_name == "FAST_INDEX":
+        if attempt_count < max_attempts:
+            doc.status = "UPLOADED"
+            doc.current_step = f"Auto-retrying FAST_INDEX ({attempt_count}/{max_attempts})"
+            db.add(doc)
+            db.commit()
+
+            _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
+            return {
+                "document_id": doc.id,
+                "queue_name": queue_name,
+                "action": "retried_fast_index",
+                "attempt_count": attempt_count,
+            }
+
+        doc.status = "REVIEW_REQUIRED"
+        doc.current_step = "Auto-stopped after repeated stale FAST_INDEX"
+        db.add(doc)
+        db.commit()
+
+        _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
+        if doc.batch_no:
+            _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+
+        return {
+            "document_id": doc.id,
+            "queue_name": queue_name,
+            "action": "moved_to_review_required",
+            "attempt_count": attempt_count,
+        }
+
+    if queue_name == "FULL_PROCESS":
+        if attempt_count < max_attempts:
+            doc.status = "INDEX_READY"
+            doc.current_step = f"Auto-retrying FULL_PROCESS ({attempt_count}/{max_attempts})"
+            db.add(doc)
+            db.commit()
+
+            if doc.batch_no:
+                _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+            else:
+                if not _has_active_for_document(db, doc.id):
+                    _enqueue_full_task(db, doc.id)
+
+            return {
+                "document_id": doc.id,
+                "queue_name": queue_name,
+                "action": "retried_full_process",
+                "attempt_count": attempt_count,
+            }
+
+        doc.status = "FAILED"
+        doc.current_step = "Auto-stopped after repeated stale FULL_PROCESS"
+        db.add(doc)
+        db.commit()
+
+        return {
+            "document_id": doc.id,
+            "queue_name": queue_name,
+            "action": "marked_failed_after_retries",
+            "attempt_count": attempt_count,
+        }
+
+    return {
+        "document_id": doc.id,
+        "queue_name": queue_name,
+        "action": "marked_failed_unknown_queue",
+        "attempt_count": attempt_count,
+    }
+
+
 def enqueue_document_pipeline(db, document_id: int) -> dict:
     doc = DocumentService().get_document(db, document_id)
     if not doc:
@@ -124,7 +270,6 @@ def enqueue_document_pipeline(db, document_id: int) -> dict:
             "message": "Indexing is already completed for this PDF.",
         }
 
-    # Auto-recover stale jobs for this document so Start can resume safely.
     queue_service.cancel_stale_for_document(db, document_id, stale_seconds=600)
 
     active = queue_service.active_for_document(db, document_id)
@@ -144,13 +289,11 @@ def enqueue_document_pipeline(db, document_id: int) -> dict:
             ],
         }
 
-    # Reset state for clean retry from UI Start button.
     doc.status = "UPLOADED"
     doc.current_step = "Queued for indexing"
     db.add(doc)
     db.commit()
 
-    # Only one active FAST_INDEX at a time across the system.
     if _has_active_fast_index(db):
         return {
             "ok": True,
@@ -178,7 +321,8 @@ def fast_index(self, document_id: int):
             _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
             return {"ok": False, "cancelled": True}
 
-        result = FastIndexPipeline().run(db, doc)
+        with _QueueHeartbeat(self.request.id):
+            result = FastIndexPipeline().run(db, doc)
 
         if result.get("rows", 0) <= 0:
             queue_service.mark_terminal(db, self.request.id, "FAILED")
@@ -187,18 +331,18 @@ def fast_index(self, document_id: int):
                 _enqueue_batch_full_process_when_ready(db, doc.batch_no)
             return {"ok": False, "error": "No index rows extracted"}
 
-        # For non-batch docs, keep immediate full processing.
         if not doc.batch_no:
-            has_active_full = any(item.queue_name == "FULL_PROCESS" for item in queue_service.active_for_document(db, document_id))
+            has_active_full = any(
+                item.queue_name == "FULL_PROCESS"
+                for item in queue_service.active_for_document(db, document_id)
+            )
             if not has_active_full and doc.status not in {"STOPPED", "CANCELLED"}:
                 _enqueue_full_task(db, document_id)
 
         queue_service.mark_terminal(db, self.request.id, "COMPLETED")
 
-        # Start next queued FAST doc now that current fast has completed.
         _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
 
-        # Batch mode: enqueue FULL_PROCESS only when batch FAST candidates are drained.
         if doc.batch_no:
             _enqueue_batch_full_process_when_ready(db, doc.batch_no)
 
@@ -229,22 +373,25 @@ def full_process(self, document_id: int):
         doc = DocumentService().get_document(db, document_id)
         if not doc:
             queue_service.mark_terminal(db, self.request.id, "FAILED")
-            return {"ok": False, "error": "Document not found"} 
+            return {"ok": False, "error": "Document not found"}
 
         if doc.status in {"STOPPED", "CANCELLED"}:
             queue_service.mark_terminal(db, self.request.id, "CANCELLED")
             return {"ok": False, "cancelled": True}
 
-        pages = OCRPipeline().run_full(db, doc)
-        queue_service.touch(db, self.request.id)
+        with _QueueHeartbeat(self.request.id):
+            pages = OCRPipeline().run_full(db, doc)
+            queue_service.touch(db, self.request.id)
 
-        VectorPipeline().run(db, doc, pages)
-        queue_service.touch(db, self.request.id)
+            VectorPipeline().run(db, doc, pages)
+            queue_service.touch(db, self.request.id)
 
-        VerificationPipeline().run(db, doc, [], pages)
-        queue_service.touch(db, self.request.id)
+            VerificationPipeline().run(db, doc, [], pages)
+            queue_service.touch(db, self.request.id)
 
         doc.status = "CHAT_READY"
+        doc.current_step = "Auto-approved"
+        db.add(doc)
         db.commit()
 
         queue_service.mark_terminal(db, self.request.id, "COMPLETED")
@@ -258,5 +405,37 @@ def full_process(self, document_id: int):
             db.commit()
         queue_service.mark_terminal(db, self.request.id, "FAILED")
         raise
+    finally:
+        db.close()
+
+
+@celery_app.task(name="queue.monitor_and_recover", bind=True)
+def monitor_and_recover(self):
+    db = SessionLocal()
+    try:
+        recovered: list[dict] = []
+        active_rows = queue_service.list_active(db)
+
+        for row in active_rows:
+            stale_seconds = QUEUE_STALE_SECONDS.get(row.queue_name, int(settings.STUCK_TASK_SECONDS or 900))
+            if row.heartbeat_at is None:
+                is_stale = True
+            else:
+                age = (time.time() - row.heartbeat_at.timestamp())
+                is_stale = age >= stale_seconds
+
+            if not is_stale:
+                continue
+
+            recovered.append(_recover_stale_row(db, row))
+
+        # After cleanup, keep FAST queue moving.
+        _start_next_fast_if_possible(db)
+
+        return {
+            "ok": True,
+            "recovered_count": len(recovered),
+            "items": recovered,
+        }
     finally:
         db.close()

@@ -28,7 +28,7 @@ import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import { BACKEND_BASE_URL } from '../api/client';
 import { deleteDocument, deleteDocumentsBulk, getDocument, listDocuments, uploadDocument, uploadDocumentBatch } from '../api/documents';
 import { createIndexRow, deleteIndexRow, getIndexRows, manualScan, startIndexing, updateIndexRow } from '../api/indexing';
-import { clearPendingQueue, getActiveQueue, getOpsStatus, restartDocumentProcessing, stopDocumentProcessing } from '../api/ops';
+import { clearPendingQueue, getActiveQueue, getOpsStatus, recoverStaleQueue, restartDocumentProcessing, stopDocumentProcessing } from '../api/ops';
 import { getDocumentPages } from '../api/pages';
 
 import DocumentLibrary from '../components/documents/DocumentLibrary';
@@ -45,7 +45,6 @@ import OpsModal from '../components/ops/OpsModal';
 
 import { useAppStore } from '../store/useAppStore';
 import { useDocumentPolling } from '../hooks/useDocumentPolling';
-import { useOpsPolling } from '../hooks/useOpsPolling';
 import type { DocumentItem, IndexRow, OpsQueueItem } from '../types';
 
 function statusTone(status?: string) {
@@ -93,6 +92,9 @@ export default function DashboardPage() {
   const [leftTab, setLeftTab] = useState<'index' | 'chat'>('index');
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const reviewWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const hasOpsSnapshotRef = useRef(false);
+  const prevQueueByIdRef = useRef<Map<number, OpsQueueItem>>(new Map());
+  const prevFailedCountRef = useRef<number>(0);
 
   const [toast, setToast] = useState<{
     open: boolean;
@@ -107,7 +109,6 @@ export default function DashboardPage() {
   const selectedDocumentId = selectedDocument?.id;
 
   useDocumentPolling(selectedDocumentId);
-  useOpsPolling();
 
   const selectedDocActiveJobs = useMemo(
     () =>
@@ -186,18 +187,51 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const fetchQueue = async () => {
+    const fetchOpsAndQueue = async () => {
       try {
-        const queue = await getActiveQueue();
+        const [ops, queue] = await Promise.all([getOpsStatus(), getActiveQueue()]);
+        setOpsStatus(ops);
         setActiveQueue(queue);
+
+        const currentById = new Map(queue.map((item) => [item.id, item]));
+        if (!hasOpsSnapshotRef.current) {
+          hasOpsSnapshotRef.current = true;
+          prevQueueByIdRef.current = currentById;
+          prevFailedCountRef.current = ops.failed_count;
+          return;
+        }
+
+        const previousById = prevQueueByIdRef.current;
+        const newlyStuck = queue.filter((item) => item.is_stuck && !previousById.get(item.id)?.is_stuck);
+        const recovered = Array.from(previousById.values()).filter(
+          (item) => item.is_stuck && !currentById.get(item.id)?.is_stuck
+        );
+        const retries = queue.filter((item) => {
+          const prev = previousById.get(item.id);
+          return !!prev && item.attempts > prev.attempts && item.status.toUpperCase() === 'RUNNING';
+        });
+
+        if (newlyStuck.length > 0) {
+          showToast('error', `${newlyStuck.length} task(s) became stuck. Auto-recovery will attempt shortly.`);
+        } else if (recovered.length > 0) {
+          showToast('success', `${recovered.length} previously stuck task(s) recovered.`);
+        } else if (retries.length > 0) {
+          showToast('info', `${retries.length} task(s) auto-retried by queue recovery.`);
+        } else if (ops.failed_count > prevFailedCountRef.current) {
+          const delta = ops.failed_count - prevFailedCountRef.current;
+          showToast('error', `${delta} document(s) moved to FAILED during recovery.`);
+        }
+
+        prevQueueByIdRef.current = currentById;
+        prevFailedCountRef.current = ops.failed_count;
       } catch {
       }
     };
 
-    fetchQueue();
-    const interval = setInterval(fetchQueue, 6000);
+    fetchOpsAndQueue();
+    const interval = setInterval(fetchOpsAndQueue, 12000);
     return () => clearInterval(interval);
-  }, []);
+  }, [setOpsStatus]);
 
   useEffect(() => {
     if (opsOpen) {
@@ -460,6 +494,19 @@ export default function DashboardPage() {
       await refreshOpsQueue();
     } catch {
       showToast('error', 'Failed to clear pending queue.');
+    } finally {
+      setOpsBusy(false);
+    }
+  };
+
+  const handleRecoverStaleQueue = async () => {
+    setOpsBusy(true);
+    try {
+      const result = await recoverStaleQueue();
+      showToast('info', result.message || 'Stale queue recovery triggered.');
+      await refreshOpsQueue();
+    } catch {
+      showToast('error', 'Failed to trigger stale recovery.');
     } finally {
       setOpsBusy(false);
     }
@@ -773,6 +820,7 @@ export default function DashboardPage() {
         busy={opsBusy}
         onStopSelected={handleStopSelected}
         onRestartSelected={handleRestartSelected}
+        onRecoverStale={handleRecoverStaleQueue}
         onClearPending={handleClearPendingQueue}
         onStopDocument={handleStopDocumentFromQueue}
       />

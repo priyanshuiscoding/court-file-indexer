@@ -11,7 +11,7 @@ from app.models.index_row import IndexRow
 from app.schemas.ops import OpsQueueItemOut, OpsStatusOut, QueueActionResponse
 from app.services.queue_service import QueueService
 from app.tasks.celery_app import celery_app
-from app.tasks.document_tasks import enqueue_document_pipeline
+from app.tasks.document_tasks import enqueue_document_pipeline, monitor_and_recover
 
 router = APIRouter(prefix="/ops", tags=["ops"])
 queue_service = QueueService()
@@ -20,11 +20,19 @@ STUCK_SECONDS = int(os.getenv("QUEUE_STUCK_SECONDS", "600"))
 
 @router.get("/status", response_model=OpsStatusOut)
 def ops_status(db: Session = Depends(get_db)):
-    indexed_count = db.query(func.count(Document.id)).filter(Document.status.in_(["INDEX_PARSED", "APPROVED", "REVIEW_REQUIRED", "INDEX_READY", "CHAT_READY"])) .scalar() or 0
+    indexed_count = db.query(func.count(Document.id)).filter(
+        Document.status.in_(["INDEX_PARSED", "APPROVED", "REVIEW_REQUIRED", "INDEX_READY", "CHAT_READY"])
+    ).scalar() or 0
+
     vectorized_count = db.query(func.count(Document.id)).filter(Document.is_vectorized.is_(True)).scalar() or 0
-    pending_queue_count = db.query(func.count(Document.id)).filter(Document.status.in_(["UPLOADED", "OCR_RUNNING", "INDEX_SEARCH_RUNNING", "VECTORIZING", "VERIFYING", "FAST_INDEX_RUNNING"])) .scalar() or 0
+
+    pending_queue_count = db.query(func.count(Document.id)).filter(
+        Document.status.in_(["UPLOADED", "OCR_RUNNING", "INDEX_SEARCH_RUNNING", "VECTORIZING", "VERIFYING", "FAST_INDEX_RUNNING"])
+    ).scalar() or 0
+
     review_queue_count = db.query(func.count(IndexRow.id)).filter(IndexRow.status == "REVIEW").scalar() or 0
     failed_count = db.query(func.count(Document.id)).filter(Document.status == "FAILED").scalar() or 0
+
     return OpsStatusOut(
         indexed_count=indexed_count,
         vectorized_count=vectorized_count,
@@ -75,6 +83,12 @@ def active_queue(db: Session = Depends(get_db)):
         )
 
     return items
+
+
+@router.post("/queue/recover-stale", response_model=QueueActionResponse)
+def recover_stale_queue():
+    monitor_and_recover.delay()
+    return QueueActionResponse(message="Stale queue recovery triggered", affected=1, ok=True)
 
 
 @router.post("/documents/{document_id}/stop", response_model=QueueActionResponse)

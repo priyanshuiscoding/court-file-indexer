@@ -74,20 +74,25 @@ def ask_chat(document_id: int, payload: ChatRequest, db: Session = Depends(get_d
             llm_service=LLMService(),
         )
 
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(rag.answer_question, document_id, question)
-        try:
-            result = future.result(timeout=settings.CHAT_REQUEST_TIMEOUT_SECONDS)
-        except FuturesTimeoutError:
-            result = {
-                "answer": "Model is still generating. Please retry this question once after a few seconds.",
-                "sources": [],
-            }
-        finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(rag.answer_question, document_id, question)
+            try:
+                result = future.result(timeout=settings.CHAT_REQUEST_TIMEOUT_SECONDS)
+            except FuturesTimeoutError:
+                result = {
+                    "answer": "The chat model took too long to respond. Please retry once. If this keeps happening, the local model service may be slow or unavailable.",
+                    "sources": [],
+                }
 
-        chat_store.add_message(db, document_id, "assistant", result["answer"])
-        return result
+        answer_text = (result.get("answer") or "").strip() or "Answer not found clearly in the indexed case file."
+        sources = result.get("sources") or []
+
+        chat_store.add_message(db, document_id, "assistant", answer_text)
+
+        return {
+            "answer": answer_text,
+            "sources": sources,
+        }
     except HTTPException:
         raise
     except Exception as exc:

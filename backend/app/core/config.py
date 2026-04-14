@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     LOCAL_RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
     LOCAL_CHAT_MODEL: str = "Qwen/Qwen2.5-3B-Instruct"
     LOCAL_VLM_MODEL: str = "Qwen/Qwen2.5-VL-7B-Instruct"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_CHAT_MODEL: str = "qwen2.5:7b-instruct"
 
     @property
     def sqlalchemy_database_uri(self) -> str:

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-
-import torch
-from transformers import pipeline
+import json
+from urllib import error, request
 
 from app.core.config import get_settings
 
@@ -11,31 +9,41 @@ settings = get_settings()
 
 
 class LLMService:
-    _generator = None
+    def _ollama_generate(self, prompt: str, timeout_seconds: int, max_new_tokens: int) -> str:
+        payload = {
+            "model": settings.OLLAMA_CHAT_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "num_predict": max_new_tokens,
+            },
+        }
 
-    def _get_generator(self):
-        if LLMService._generator is None:
-            use_cuda = torch.cuda.is_available()
-            pipeline_kwargs = {
-                "task": "text-generation",
-                "model": settings.LOCAL_CHAT_MODEL,
-            }
-            if use_cuda:
-                pipeline_kwargs["device_map"] = "auto"
-                pipeline_kwargs["torch_dtype"] = torch.float16
+        body = json.dumps(payload).encode("utf-8")
+        req = request.Request(
+            url=f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
 
-            LLMService._generator = pipeline(**pipeline_kwargs)
-        return LLMService._generator
+        try:
+            with request.urlopen(req, timeout=timeout_seconds) as resp:
+                raw = resp.read().decode("utf-8", errors="ignore")
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore") if exc.fp else str(exc)
+            raise RuntimeError(f"Ollama HTTP error: {detail}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Ollama request failed: {exc}") from exc
 
-    def _generate_once(self, prompt: str, max_new_tokens: int) -> str:
-        generator = self._get_generator()
-        output = generator(
-            prompt,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            return_full_text=False,
-        )[0]["generated_text"]
-        return output.strip()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid Ollama JSON response: {raw[:500]}") from exc
+
+        text = (data.get("response") or "").strip()
+        return text
 
     def generate(
         self,
@@ -44,12 +52,8 @@ class LLMService:
         max_new_tokens: int = 380,
     ) -> str:
         timeout = timeout_seconds or settings.CHAT_GENERATION_TIMEOUT_SECONDS
-
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(self._generate_once, prompt, max_new_tokens)
-        try:
-            return future.result(timeout=timeout)
-        except FuturesTimeoutError as exc:
-            raise TimeoutError(f"LLM generation timed out after {timeout} seconds") from exc
-        finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+        return self._ollama_generate(
+            prompt=prompt,
+            timeout_seconds=timeout,
+            max_new_tokens=max_new_tokens,
+        )

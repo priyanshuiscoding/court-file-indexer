@@ -125,6 +125,8 @@ STRICT RULES:
 - If a field is missing, write exactly: Not found in indexed pages.
 - Keep output compact and factual.
 - Mention page numbers for each important factual block.
+- Do not use outside knowledge.
+- Do not guess.
 
 User request:
 {question}
@@ -148,7 +150,7 @@ Case Summary
 11. Sentence/Jail Term (if any):
 12. Relief Sought:
 13. Final Direction/Current Status:
-14. Short Narrative (6-8 lines):
+14. Short Narrative (5-7 lines):
 15. Source Pages:
 """.strip()
 
@@ -162,6 +164,8 @@ Rules:
 - If answer is not present, return exactly: Answer not found clearly in the indexed case file.
 - Keep response concise and direct.
 - Always include source page numbers.
+- Do not use outside knowledge.
+- Do not guess.
 
 User question:
 {question}
@@ -197,7 +201,7 @@ Pages: <comma-separated page numbers>
                 "11. Sentence/Jail Term (if any): Not found in indexed pages.\n"
                 "12. Relief Sought: Not found in indexed pages.\n"
                 "13. Final Direction/Current Status: Not found in indexed pages.\n"
-                "14. Short Narrative (6-8 lines): Generation timed out; please retry once.\n"
+                "14. Short Narrative (5-7 lines): Could not generate a reliable summary from the current model response.\n"
                 f"15. Source Pages: {pages}"
             )
 
@@ -206,7 +210,7 @@ Pages: <comma-separated page numbers>
 
         return (
             "Answer not found clearly in the indexed case file.\n"
-            f"Why: Model response timed out; nearest extracted evidence is available.\n"
+            "Why: The model could not return a reliable grounded answer in time.\n"
             f"Pages: {pages}\n"
             f"Evidence: {top_text}"
         )
@@ -225,8 +229,13 @@ Pages: <comma-separated page numbers>
         prompt = self._build_summary_prompt(question, context) if is_summary else self._build_qa_prompt(question, context)
 
         try:
-            max_tokens = 520 if is_summary else 260
-            answer = self.llm_service.generate(prompt, timeout_seconds=(settings.CHAT_GENERATION_TIMEOUT_SECONDS + 25 if is_summary else settings.CHAT_GENERATION_TIMEOUT_SECONDS), max_new_tokens=max_tokens)
+            max_tokens = 420 if is_summary else 180
+            timeout = settings.CHAT_GENERATION_TIMEOUT_SECONDS + (20 if is_summary else 0)
+            answer = self.llm_service.generate(
+                prompt,
+                timeout_seconds=timeout,
+                max_new_tokens=max_tokens,
+            )
             if not answer:
                 answer = "Answer not found clearly in the indexed case file."
         except Exception:
@@ -243,4 +252,3 @@ Pages: <comma-separated page numbers>
                 for c in chunks
             ],
         }
-

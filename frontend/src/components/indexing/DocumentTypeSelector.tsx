@@ -74,6 +74,11 @@ export default function DocumentTypeSelector({
         disabled={loading}
       >
         <MenuItem value="">Select</MenuItem>
+        {!loading && options.length === 0 ? (
+          <MenuItem value="" disabled>
+            No options loaded
+          </MenuItem>
+        ) : null}
         {options.map((item) => (
           <MenuItem key={item.code} value={item.code}>
             {item.label} ({item.code})
@@ -105,6 +110,11 @@ export default function DocumentTypeSelector({
         }}
       >
         <MenuItem value="">Select</MenuItem>
+        {!loading && documentCode && subOptions.length === 0 ? (
+          <MenuItem value="" disabled>
+            No sub-document options
+          </MenuItem>
+        ) : null}
         {subOptions.map((item) => (
           <MenuItem key={item.code} value={item.code}>
             {item.label} ({item.code})

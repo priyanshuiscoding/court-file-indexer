@@ -12,18 +12,25 @@ export default function SearchBar({ onSearch }: Props) {
   const [batchNo, setBatchNo] = useState('');
 
   return (
-    <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '1fr 1fr auto auto' }} gap={1.5}>
+    <Box
+      display="grid"
+      gridTemplateColumns={{ xs: '1fr', md: '1.3fr 1fr auto auto' }}
+      gap={1}
+      alignItems="center"
+    >
       <TextField
         label="Search by CNR / Filing No"
         size="small"
         value={cnr}
         onChange={(e) => setCnr(e.target.value)}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
       />
       <TextField
         label="Batch No"
         size="small"
         value={batchNo}
         onChange={(e) => setBatchNo(e.target.value)}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
       />
       <Button variant="outlined" onClick={() => onSearch({ cnr, batch_no: batchNo })} sx={{ textTransform: 'none' }}>
         Search

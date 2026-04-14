@@ -616,9 +616,10 @@ export default function DashboardPage() {
               minWidth: 0,
               height: { xl: 'calc(100vh - 120px)' },
               display: 'grid',
-              gridTemplateRows: { xs: 'auto auto', xl: 'minmax(0, 46%) minmax(0, 54%)' },
+              gridTemplateRows: { xs: 'auto auto', xl: 'minmax(0, 42%) minmax(0, 58%)' },
               gap: 2,
-              overflow: { xl: 'hidden' }
+              overflowY: { xl: 'auto' },
+              pr: { xl: 1 }
             }}
           >
             <Paper
@@ -630,7 +631,7 @@ export default function DashboardPage() {
                 overflow: 'hidden',
                 display: 'grid',
                 gap: 2,
-                gridTemplateRows: 'auto minmax(0, 1fr)',
+                gridTemplateRows: 'auto auto minmax(0, 1fr)',
               }}
             >
               <Box
@@ -639,8 +640,27 @@ export default function DashboardPage() {
                   borderRadius: 2,
                   border: '1px solid #e5e7eb',
                   bgcolor: '#f8fafc',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  alignItems: 'stretch'
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <UploadFileRoundedIcon fontSize="small" color="primary" />
+                  <Typography fontWeight={700}>Upload</Typography>
+                </Stack>
+                <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: '1px solid #e5e7eb',
+                  bgcolor: '#f8fafc',
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) auto' },
+                  gridTemplateColumns: { xs: '1fr', xl: 'auto minmax(0, 1fr)' },
                   gap: 1.5,
                   alignItems: 'center'
                 }}
@@ -651,14 +671,6 @@ export default function DashboardPage() {
                     <Typography fontWeight={700}>PDF Search</Typography>
                   </Stack>
                   <SearchBar onSearch={handleSearch} />
-                </Stack>
-
-                <Stack spacing={1} minWidth={0}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <UploadFileRoundedIcon fontSize="small" color="primary" />
-                    <Typography fontWeight={700}>Upload</Typography>
-                  </Stack>
-                  <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
                 </Stack>
               </Box>
 
@@ -709,13 +721,19 @@ export default function DashboardPage() {
               }}
             >
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  justifyContent="space-between"
+                  alignItems={{ xs: 'flex-start', md: 'center' }}
+                  spacing={1}
+                  mb={1}
+                >
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <TableRowsRoundedIcon fontSize="small" color="primary" />
                     <Typography fontWeight={700}>Review workspace</Typography>
                   </Stack>
 
-                  <Stack direction="row" spacing={1}>
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <Chip size="small" label={`AUTO_OK ${autoOkCount}`} color="success" variant="outlined" />
                     <Chip size="small" label={`REVIEW ${reviewCount}`} color="warning" variant="outlined" />
                     <Button

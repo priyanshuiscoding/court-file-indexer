@@ -30,8 +30,8 @@ export default function IndexEditorDrawer({ open, row, onClose, onSave }: Props)
   useEffect(() => {
     setForm(row || {});
     setDocSelection({
-      document_code: null,
-      sub_document_code: null,
+      document_code: row?.mapped_document_type || null,
+      sub_document_code: row?.mapped_sub_document_type || null,
       other: ''
     });
   }, [row]);

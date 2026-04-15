@@ -13,17 +13,17 @@ type Props = {
 export default function DocumentDetailsPanel({ document }: Props) {
   if (!document) {
     return (
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3 }}>
         <Typography color="text.secondary">Select a document to see its details.</Typography>
       </Paper>
     );
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
         <Box>
-          <Typography variant="h6" fontWeight={800}>
+          <Typography variant="h6" fontWeight={800} sx={{ fontSize: 24 }}>
             {document.cnr_number || document.file_name}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>

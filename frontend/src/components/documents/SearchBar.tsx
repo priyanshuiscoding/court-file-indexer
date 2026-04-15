@@ -10,12 +10,12 @@ type Props = {
 export default function SearchBar({ onSearch }: Props) {
   const [cnr, setCnr] = useState('');
   const [batchNo, setBatchNo] = useState('');
-  const actionButtonSx = { textTransform: 'none', minHeight: 38, minWidth: 92 };
+  const actionButtonSx = { textTransform: 'none', minHeight: 40, minWidth: 120, borderRadius: 2, fontWeight: 700 };
 
   return (
     <Box
       display="grid"
-      gridTemplateColumns={{ xs: '1fr', md: '1.3fr 1fr auto auto' }}
+      gridTemplateColumns={{ xs: '1fr', md: '1.35fr 1fr auto auto' }}
       gap={1}
       alignItems="center"
     >
@@ -24,14 +24,14 @@ export default function SearchBar({ onSearch }: Props) {
         size="small"
         value={cnr}
         onChange={(e) => setCnr(e.target.value)}
-        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 40 } }}
       />
       <TextField
         label="Batch No"
         size="small"
         value={batchNo}
         onChange={(e) => setBatchNo(e.target.value)}
-        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 40 } }}
       />
       <Button
         variant="outlined"

@@ -615,14 +615,89 @@ export default function DashboardPage() {
             sx={{
               minWidth: 0,
               height: { xl: 'calc(100vh - 120px)' },
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.25fr) minmax(0, 0.95fr)' },
-              alignItems: 'stretch',
+              display: 'flex',
+              flexDirection: 'column',
               gap: 2,
-              overflow: { xl: 'hidden' },
-              pr: { xl: 1 },
+              minHeight: 0,
+              pr: { xl: 1 }
             }}
           >
+            <Paper
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                flexShrink: 0
+              }}
+            >
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: '1px solid #e5e7eb',
+                  bgcolor: '#f8fafc',
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) 1px minmax(0, 1fr)' },
+                  gap: 1.5,
+                  alignItems: 'start'
+                }}
+              >
+                <Stack spacing={1} minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <UploadFileRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Upload</Typography>
+                  </Stack>
+                  <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
+                </Stack>
+
+                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' } }} />
+
+                <Stack spacing={1} minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <SearchRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>PDF Search</Typography>
+                  </Stack>
+                  <SearchBar onSearch={handleSearch} />
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.25fr) minmax(0, 1fr)' },
+                  gap: 2,
+                  alignItems: 'stretch',
+                  minHeight: { xs: 320, xl: 340 },
+                }}
+              >
+                <Stack sx={{ minHeight: { xs: 320, xl: 340 } }}>
+                  <DocumentLibrary
+                    documents={documents}
+                    selectedDocumentId={selectedDocument?.id}
+                    onSelect={handleSelectDocument}
+                    onDeleteSingle={handleDeleteSingleDocument}
+                    onDeleteMultiple={handleDeleteMultipleDocuments}
+                    deleting={actionBusy}
+                    height="100%"
+                  />
+                </Stack>
+
+                <Stack spacing={1.5}>
+                  <ManualScanPanel
+                    disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
+                    disabledReason={indexStartDisabledReason}
+                    onStartDefault={handleStartDefault}
+                    onManualScan={handleManualScan}
+                  />
+                  <ReviewSummary rows={indexRows} />
+                  <DocumentDetailsPanel document={selectedDocument} />
+                </Stack>
+              </Box>
+            </Paper>
+
             <Paper
               variant="outlined"
               ref={reviewWorkspaceRef}
@@ -632,8 +707,9 @@ export default function DashboardPage() {
                 bgcolor: 'background.paper',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: { xs: 460, xl: 0 },
-                order: { xs: 2, xl: 1 },
+                minHeight: { xs: 420, xl: 0 },
+                flex: 1,
+                minWidth: 0
               }}
             >
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
@@ -693,7 +769,7 @@ export default function DashboardPage() {
 
               <Divider />
 
-              <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0 }}>
+              <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0, flex: 1 }}>
                 {leftTab === 'index' ? (
                   <IndexRowTable rows={indexRows} onJump={handleJump} onEdit={handleEdit} onDelete={handleDeleteRow} onReorder={handleReorderRows} />
                 ) : (
@@ -707,71 +783,6 @@ export default function DashboardPage() {
                 )}
               </Box>
             </Paper>
-
-            <Stack
-              spacing={2}
-              sx={{
-                minWidth: 0,
-                minHeight: 0,
-                overflowY: { xl: 'auto' },
-                order: { xs: 1, xl: 2 },
-                pr: { xl: 0.5 }
-              }}
-            >
-              <Paper
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  p: 1.5,
-                  borderColor: '#dbe4ef',
-                  bgcolor: '#fbfdff',
-                }}
-              >
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
-                    gap: 1.5,
-                    alignItems: 'start'
-                  }}
-                >
-                  <Stack spacing={1} minWidth={0}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <UploadFileRoundedIcon fontSize="small" color="primary" />
-                      <Typography fontWeight={700}>Upload</Typography>
-                    </Stack>
-                    <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
-                  </Stack>
-
-                  <Stack spacing={1} minWidth={0}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <SearchRoundedIcon fontSize="small" color="primary" />
-                      <Typography fontWeight={700}>PDF Search</Typography>
-                    </Stack>
-                    <SearchBar onSearch={handleSearch} />
-                  </Stack>
-                </Box>
-              </Paper>
-
-              <DocumentLibrary
-                documents={documents}
-                selectedDocumentId={selectedDocument?.id}
-                onSelect={handleSelectDocument}
-                onDeleteSingle={handleDeleteSingleDocument}
-                onDeleteMultiple={handleDeleteMultipleDocuments}
-                deleting={actionBusy}
-                height={420}
-              />
-
-              <ManualScanPanel
-                disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
-                disabledReason={indexStartDisabledReason}
-                onStartDefault={handleStartDefault}
-                onManualScan={handleManualScan}
-              />
-              <ReviewSummary rows={indexRows} />
-              <DocumentDetailsPanel document={selectedDocument} />
-            </Stack>
           </Box>
 
           <Paper

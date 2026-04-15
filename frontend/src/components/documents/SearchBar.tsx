@@ -10,6 +10,7 @@ type Props = {
 export default function SearchBar({ onSearch }: Props) {
   const [cnr, setCnr] = useState('');
   const [batchNo, setBatchNo] = useState('');
+  const actionButtonSx = { textTransform: 'none', minHeight: 38, minWidth: 92 };
 
   return (
     <Box
@@ -23,19 +24,29 @@ export default function SearchBar({ onSearch }: Props) {
         size="small"
         value={cnr}
         onChange={(e) => setCnr(e.target.value)}
-        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }}
       />
       <TextField
         label="Batch No"
         size="small"
         value={batchNo}
         onChange={(e) => setBatchNo(e.target.value)}
-        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }}
       />
-      <Button variant="outlined" onClick={() => onSearch({ cnr, batch_no: batchNo })} sx={{ textTransform: 'none' }}>
+      <Button
+        variant="outlined"
+        size="small"
+        onClick={() => onSearch({ cnr, batch_no: batchNo })}
+        sx={actionButtonSx}
+      >
         Search
       </Button>
-      <Button variant="text" onClick={() => { setCnr(''); setBatchNo(''); onSearch({}); }} sx={{ textTransform: 'none' }}>
+      <Button
+        variant="text"
+        size="small"
+        onClick={() => { setCnr(''); setBatchNo(''); onSearch({}); }}
+        sx={actionButtonSx}
+      >
         Reset
       </Button>
     </Box>

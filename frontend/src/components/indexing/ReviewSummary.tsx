@@ -17,7 +17,8 @@ export default function ReviewSummary({ rows }: Props) {
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.5}
+        spacing={1}
+        useFlexGap
         flexWrap="wrap"
         alignItems={{ xs: 'flex-start', sm: 'center' }}
       >

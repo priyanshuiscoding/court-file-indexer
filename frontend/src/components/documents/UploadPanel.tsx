@@ -45,6 +45,7 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
 
   const content = (
     <Stack spacing={compact ? 1 : 1.5}>
+      {/** keep action buttons aligned in compact top bar */ }
       {!compact ? (
         <Typography variant="subtitle1" fontWeight={800} mb={0.5}>
           Upload PDF
@@ -56,7 +57,12 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
         alignItems={{ xs: 'stretch', md: 'center' }}
         flexWrap="wrap"
       >
-        <Button variant="outlined" component="label" sx={{ textTransform: 'none', borderRadius: 2 }}>
+        <Button
+          variant="outlined"
+          component="label"
+          size="small"
+          sx={{ textTransform: 'none', borderRadius: 2, minHeight: 38 }}
+        >
           {file ? file.name : 'Choose PDF'}
           <input
             hidden
@@ -71,7 +77,11 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
           size="small"
           value={cnr}
           onChange={(e) => setCnr(e.target.value)}
-          sx={compact ? { minWidth: 160, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } } : { minWidth: 160 }}
+          sx={
+            compact
+              ? { minWidth: 160, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }
+              : { minWidth: 160 }
+          }
         />
 
         <TextField
@@ -80,21 +90,31 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
           value={batchNo}
           onChange={(e) => setBatchNo(e.target.value)}
           helperText={compact ? undefined : "Optional for batch upload. If empty, system will auto-generate one."}
-          sx={compact ? { minWidth: 140, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } } : { minWidth: 140 }}
+          sx={
+            compact
+              ? { minWidth: 140, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc', minHeight: 38 } }
+              : { minWidth: 140 }
+          }
         />
 
         <Button
           variant="contained"
+          size="small"
           disabled={!file || uploading}
           onClick={handleUpload}
-          sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}
+          sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700, minHeight: 38, minWidth: 110 }}
         >
           {uploading ? 'Uploading...' : 'Upload PDF'}
         </Button>
 
         {onBatchUpload ? (
           <>
-            <Button variant="outlined" component="label" sx={{ textTransform: 'none', borderRadius: 2 }}>
+            <Button
+              variant="outlined"
+              component="label"
+              size="small"
+              sx={{ textTransform: 'none', borderRadius: 2, minHeight: 38 }}
+            >
               {batchFiles.length ? `${batchFiles.length} files selected` : 'Choose Batch PDFs'}
               <input
                 hidden
@@ -106,9 +126,10 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
             </Button>
             <Button
               variant="contained"
+              size="small"
               disabled={!batchFiles.length || uploading}
               onClick={handleBatchUpload}
-              sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}
+              sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700, minHeight: 38, minWidth: 110 }}
             >
               {uploading ? 'Uploading...' : 'Batch Upload'}
             </Button>

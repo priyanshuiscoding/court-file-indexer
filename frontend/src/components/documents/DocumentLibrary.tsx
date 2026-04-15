@@ -71,7 +71,10 @@ export default function DocumentLibrary({
   };
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', height }}>
+    <Paper
+      variant="outlined"
+      sx={{ borderRadius: 3, overflow: 'hidden', height, display: 'flex', flexDirection: 'column' }}
+    >
       <Stack
         direction="row"
         justifyContent="space-between"
@@ -96,7 +99,7 @@ export default function DocumentLibrary({
         </Stack>
       </Stack>
 
-      <List sx={{ maxHeight: 286, overflow: 'auto', p: 0 }}>
+      <List sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 0 }}>
         {documents.map((doc) => (
           <ListItemButton
             key={doc.id}

@@ -667,9 +667,10 @@ export default function DashboardPage() {
                   gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.35fr) minmax(0, 1fr)' },
                   gap: 2,
                   alignItems: 'stretch',
+                  minHeight: { xl: 360 },
                 }}
               >
-                <Stack>
+                <Stack sx={{ minHeight: { xs: 340, xl: 360 } }}>
                   <DocumentLibrary
                     documents={documents}
                     selectedDocumentId={selectedDocument?.id}
@@ -677,7 +678,7 @@ export default function DashboardPage() {
                     onDeleteSingle={handleDeleteSingleDocument}
                     onDeleteMultiple={handleDeleteMultipleDocuments}
                     deleting={actionBusy}
-                    height={340}
+                    height="100%"
                   />
                 </Stack>
 

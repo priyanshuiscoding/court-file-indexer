@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ï»¿import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
@@ -71,7 +71,7 @@ export default function ManualScanPanel({ disabled, disabledReason, onStartDefau
           onClick={handleDefault}
           sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
         >
-          {loading ? 'Starting…' : 'Start Strict Indexing (Pages 1–10)'}
+          {loading ? 'Starting...' : 'Start Strict Indexing (Pages 1-10)'}
         </Button>
 
         <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '1fr 1fr auto' }} gap={1.5}>

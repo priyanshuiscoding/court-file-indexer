@@ -30,7 +30,7 @@ export default function DocumentDetailsPanel({ document }: Props) {
             {document.file_name}
           </Typography>
 
-          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1.5 }}>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" sx={{ mt: 1.5 }}>
             <Chip size="small" label={`Batch: ${document.batch_no || '-'}`} variant="outlined" />
             <Chip size="small" label={`Pages: ${document.page_count}`} variant="outlined" />
             <Chip size="small" label={`Vectorized: ${document.is_vectorized ? 'Yes' : 'No'}`} variant="outlined" />

@@ -618,7 +618,7 @@ export default function DashboardPage() {
               display: 'flex',
               flexDirection: 'column',
               gap: 2,
-              minHeight: 0,
+              overflowY: { xl: 'auto' },
               pr: { xl: 1 }
             }}
           >
@@ -629,8 +629,7 @@ export default function DashboardPage() {
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 2,
-                flexShrink: 0
+                gap: 2
               }}
             >
               <Box
@@ -640,7 +639,7 @@ export default function DashboardPage() {
                   border: '1px solid #e5e7eb',
                   bgcolor: '#f8fafc',
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) 1px minmax(0, 1fr)' },
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) minmax(0, 1fr)' },
                   gap: 1.5,
                   alignItems: 'start'
                 }}
@@ -652,8 +651,6 @@ export default function DashboardPage() {
                   </Stack>
                   <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
                 </Stack>
-
-                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', xl: 'block' } }} />
 
                 <Stack spacing={1} minWidth={0}>
                   <Stack direction="row" spacing={1} alignItems="center">
@@ -667,13 +664,12 @@ export default function DashboardPage() {
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.25fr) minmax(0, 1fr)' },
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.35fr) minmax(0, 1fr)' },
                   gap: 2,
                   alignItems: 'stretch',
-                  minHeight: { xs: 320, xl: 340 },
                 }}
               >
-                <Stack sx={{ minHeight: { xs: 320, xl: 340 } }}>
+                <Stack>
                   <DocumentLibrary
                     documents={documents}
                     selectedDocumentId={selectedDocument?.id}
@@ -681,11 +677,11 @@ export default function DashboardPage() {
                     onDeleteSingle={handleDeleteSingleDocument}
                     onDeleteMultiple={handleDeleteMultipleDocuments}
                     deleting={actionBusy}
-                    height="100%"
+                    height={340}
                   />
                 </Stack>
 
-                <Stack spacing={1.5}>
+                <Stack spacing={2}>
                   <ManualScanPanel
                     disabled={!selectedDocument || actionBusy || !!indexStartDisabledReason}
                     disabledReason={indexStartDisabledReason}
@@ -707,9 +703,8 @@ export default function DashboardPage() {
                 bgcolor: 'background.paper',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: { xs: 420, xl: 0 },
-                flex: 1,
-                minWidth: 0
+                minHeight: { xl: 460 },
+                flexShrink: 0
               }}
             >
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
@@ -769,7 +764,7 @@ export default function DashboardPage() {
 
               <Divider />
 
-              <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0, flex: 1 }}>
+              <Box sx={{ p: 2, overflowY: 'auto', minHeight: 0 }}>
                 {leftTab === 'index' ? (
                   <IndexRowTable rows={indexRows} onJump={handleJump} onEdit={handleEdit} onDelete={handleDeleteRow} onReorder={handleReorderRows} />
                 ) : (

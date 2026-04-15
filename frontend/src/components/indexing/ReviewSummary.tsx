@@ -14,24 +14,18 @@ export default function ReviewSummary({ rows }: Props) {
   const generatedCount = rows.filter((row) => row.generated_from_content).length;
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3 }}>
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
-        spacing={1}
-        useFlexGap
+        spacing={1.5}
         flexWrap="wrap"
         alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
       >
-        <Typography fontWeight={700} sx={{ minWidth: 120 }}>
-          Review Summary
-        </Typography>
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <Chip size="small" label={`Total Rows: ${rows.length}`} variant="outlined" />
-          <Chip size="small" label={`Review: ${reviewCount}`} color="warning" variant="outlined" />
-          <Chip size="small" label={`Auto OK: ${autoOkCount}`} color="success" variant="outlined" />
-          <Chip size="small" label={`Generated Fallback: ${generatedCount}`} color="default" variant="outlined" />
-        </Stack>
+        <Typography fontWeight={700}>Review Summary</Typography>
+        <Chip size="small" label={`Total Rows: ${rows.length}`} variant="outlined" />
+        <Chip size="small" label={`Review: ${reviewCount}`} color="warning" variant="outlined" />
+        <Chip size="small" label={`Auto OK: ${autoOkCount}`} color="success" variant="outlined" />
+        <Chip size="small" label={`Generated Fallback: ${generatedCount}`} color="default" variant="outlined" />
       </Stack>
     </Paper>
   );

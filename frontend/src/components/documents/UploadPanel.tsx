@@ -71,7 +71,7 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
           size="small"
           value={cnr}
           onChange={(e) => setCnr(e.target.value)}
-          sx={{ minWidth: 160 }}
+          sx={compact ? { minWidth: 160, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } } : { minWidth: 160 }}
         />
 
         <TextField
@@ -80,7 +80,7 @@ export default function UploadPanel({ onUpload, onBatchUpload, compact = false }
           value={batchNo}
           onChange={(e) => setBatchNo(e.target.value)}
           helperText={compact ? undefined : "Optional for batch upload. If empty, system will auto-generate one."}
-          sx={{ minWidth: 140 }}
+          sx={compact ? { minWidth: 140, '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } } : { minWidth: 140 }}
         />
 
         <Button

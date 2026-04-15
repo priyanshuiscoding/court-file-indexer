@@ -615,8 +615,8 @@ export default function DashboardPage() {
             sx={{
               minWidth: 0,
               height: { xl: 'calc(100vh - 120px)' },
-              display: 'grid',
-              gridTemplateRows: { xs: 'auto auto', xl: 'minmax(0, 42%) minmax(0, 58%)' },
+              display: 'flex',
+              flexDirection: 'column',
               gap: 2,
               overflowY: { xl: 'auto' },
               pr: { xl: 1 }
@@ -625,13 +625,11 @@ export default function DashboardPage() {
             <Paper
               variant="outlined"
               sx={{
-                minHeight: 0,
                 borderRadius: 3,
                 p: 2,
-                overflow: 'hidden',
-                display: 'grid',
-                gap: 2,
-                gridTemplateRows: 'auto auto minmax(0, 1fr)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
               }}
             >
               <Box
@@ -640,31 +638,20 @@ export default function DashboardPage() {
                   borderRadius: 2,
                   border: '1px solid #e5e7eb',
                   bgcolor: '#f8fafc',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                  alignItems: 'stretch'
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <UploadFileRoundedIcon fontSize="small" color="primary" />
-                  <Typography fontWeight={700}>Upload</Typography>
-                </Stack>
-                <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
-              </Box>
-
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 2,
-                  border: '1px solid #e5e7eb',
-                  bgcolor: '#f8fafc',
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', xl: 'auto minmax(0, 1fr)' },
+                  gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) minmax(0, 1fr)' },
                   gap: 1.5,
-                  alignItems: 'center'
+                  alignItems: 'start'
                 }}
               >
+                <Stack spacing={1} minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <UploadFileRoundedIcon fontSize="small" color="primary" />
+                    <Typography fontWeight={700}>Upload</Typography>
+                  </Stack>
+                  <UploadPanel compact onUpload={handleUpload} onBatchUpload={handleBatchUpload} />
+                </Stack>
+
                 <Stack spacing={1} minWidth={0}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <SearchRoundedIcon fontSize="small" color="primary" />
@@ -680,10 +667,9 @@ export default function DashboardPage() {
                   gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.35fr) minmax(0, 1fr)' },
                   gap: 2,
                   alignItems: 'stretch',
-                  minHeight: 0,
                 }}
               >
-                <Stack sx={{ minHeight: 0 }}>
+                <Stack>
                   <DocumentLibrary
                     documents={documents}
                     selectedDocumentId={selectedDocument?.id}
@@ -691,7 +677,7 @@ export default function DashboardPage() {
                     onDeleteSingle={handleDeleteSingleDocument}
                     onDeleteMultiple={handleDeleteMultipleDocuments}
                     deleting={actionBusy}
-                    height="100%"
+                    height={340}
                   />
                 </Stack>
 
@@ -717,7 +703,8 @@ export default function DashboardPage() {
                 bgcolor: 'background.paper',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 0
+                minHeight: { xl: 460 },
+                flexShrink: 0
               }}
             >
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>

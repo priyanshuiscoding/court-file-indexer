@@ -45,7 +45,6 @@ class FastIndexPipeline:
 
         result = run_strict_index_pipeline(payloads, document.page_count)
 
-        # clear old rows
         db.query(IndexRow).filter(IndexRow.document_id == document.id).delete()
 
         json_rows: list[dict] = []
@@ -97,6 +96,7 @@ class FastIndexPipeline:
         if row_count == 0:
             document.status = "REVIEW_REQUIRED"
             document.current_step = "No index rows found"
+            db.add(document)
             db.commit()
             return {
                 "rows": 0,
@@ -108,13 +108,16 @@ class FastIndexPipeline:
             }
 
         document.status = "INDEX_READY"
+        db.add(document)
         db.commit()
 
         index_json_path = None
         try:
             index_json_path = self.index_json_exporter.save_index_json(document, json_rows)
+            document.index_json_path = index_json_path
+            db.add(document)
+            db.commit()
         except Exception:
-            # Export is non-blocking; do not stop pipeline progression.
             logger.exception("Failed to export index JSON for document_id=%s", document.id)
 
         return {

@@ -9,6 +9,12 @@ class Document(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     cnr_number: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+
+    case_type: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    case_no: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    case_year: Mapped[str | None] = mapped_column(String(16), index=True, nullable=True)
+    case_key: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+
     case_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
     file_name: Mapped[str] = mapped_column(String(512), nullable=False)
     original_path: Mapped[str] = mapped_column(Text, nullable=False)
@@ -19,6 +25,10 @@ class Document(Base):
     is_vectorized: Mapped[bool] = mapped_column(Boolean, default=False)
     chat_ready: Mapped[bool] = mapped_column(Boolean, default=False)
     batch_no: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+
+    source_system: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    index_json_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_CHAT_MODEL: str = "qwen2.5:7b-instruct"
 
+    EXTERNAL_FETCH_ENABLED: bool = False
+    EXTERNAL_FETCH_URL: str = ""
+    EXTERNAL_FETCH_API_KEY: str = ""
+    EXTERNAL_FETCH_TIMEOUT_SECONDS: int = 60
+    EXTERNAL_FETCH_BATCH_SIZE: int = 10
+    EXTERNAL_FETCH_SOURCE_SYSTEM: str = "external_api"
+
     @property
     def sqlalchemy_database_uri(self) -> str:
         return (

@@ -14,6 +14,7 @@ celery_app = Celery(
     include=[
         "app.tasks.document_tasks",
         "app.tasks.ops_tasks",
+        "app.tasks.external_fetch_tasks",
     ],
 )
 
@@ -26,6 +27,7 @@ celery_app.conf.task_routes = {
     "document.full_process": {"queue": FULL_PROCESS_QUEUE},
     "queue.monitor_and_recover": {"queue": FAST_INDEX_QUEUE},
     "ops.ping": {"queue": FAST_INDEX_QUEUE},
+    "integration.fetch_external_batch": {"queue": FAST_INDEX_QUEUE},
 }
 
 celery_app.conf.beat_schedule = {
@@ -33,4 +35,10 @@ celery_app.conf.beat_schedule = {
         "task": "queue.monitor_and_recover",
         "schedule": 60.0,
     },
+    # Optional periodic external pull; disabled by default via EXTERNAL_FETCH_ENABLED.
+    # Keep manual trigger as primary mode unless explicitly enabled in deployment.
+    # "integration-fetch-external-every-5-minutes": {
+    #     "task": "integration.fetch_external_batch",
+    #     "schedule": 300.0,
+    # },
 }

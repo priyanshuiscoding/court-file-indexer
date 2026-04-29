@@ -13,6 +13,7 @@ from app.api.v1.retries import router as retries_router
 from app.api.v1.integrations import router as integrations_router
 from app.api.v1.internal_ingest import router as internal_ingest_router
 from app.api.v1.external_fetch import router as external_fetch_router
+from app.api.v1.high_court_import import router as high_court_import_router
 from app.api.v1.test_ingest import router as test_router
 from app.api.v1.ws import router as ws_router
 
@@ -31,5 +32,6 @@ api_router.include_router(chat_router)
 api_router.include_router(integrations_router)
 api_router.include_router(internal_ingest_router)
 api_router.include_router(external_fetch_router)
+api_router.include_router(high_court_import_router)
 api_router.include_router(test_router)
 api_router.include_router(ws_router)

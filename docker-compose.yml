@@ -39,6 +39,7 @@ services:
       - qdrant
     volumes:
       - ./storage:/app/storage
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -53,6 +54,7 @@ services:
       - qdrant
     volumes:
       - ./storage:/app/storage
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
 
   worker_fast:
@@ -67,6 +69,7 @@ services:
       - qdrant
     volumes:
       - ./storage:/app/storage
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
 
   worker_beat:

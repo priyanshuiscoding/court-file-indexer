@@ -80,6 +80,16 @@ class Settings(BaseSettings):
     EXTERNAL_FETCH_BATCH_SIZE: int = 10
     EXTERNAL_FETCH_SOURCE_SYSTEM: str = "external_api"
 
+    HC_MYSQL_HOST: str = ""
+    HC_MYSQL_PORT: int = 3306
+    HC_MYSQL_DB: str = "Digitization"
+    HC_MYSQL_USER: str = ""
+    HC_MYSQL_PASSWORD: str = ""
+    HC_MYSQL_TABLE: str = "mp_indexing_batch"
+    HC_MOUNT_ROOT: str = "/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final"
+    HC_IMPORT_LIMIT: int = 10
+    HC_SOURCE_SYSTEM: str = "high_court_mysql"
+
     @property
     def sqlalchemy_database_uri(self) -> str:
         return (

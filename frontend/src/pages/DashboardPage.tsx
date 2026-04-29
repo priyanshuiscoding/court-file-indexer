@@ -583,6 +583,15 @@ export default function DashboardPage() {
 
             <Button
               variant="outlined"
+              component="a"
+              href="/high-court-import"
+              sx={{ textTransform: 'none', borderRadius: 2 }}
+            >
+              High Court Import
+            </Button>
+
+            <Button
+              variant="outlined"
               startIcon={<SettingsRoundedIcon />}
               onClick={() => setOpsOpen(true)}
               sx={{ textTransform: 'none', borderRadius: 2 }}

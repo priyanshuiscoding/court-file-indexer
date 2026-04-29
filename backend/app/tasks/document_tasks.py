@@ -14,11 +14,13 @@ from app.pipelines.ocr_pipeline import OCRPipeline
 from app.pipelines.vector_pipeline import VectorPipeline
 from app.pipelines.verification_pipeline import VerificationPipeline
 from app.services.document_service import DocumentService
+from app.services.high_court_import_status_sync_service import HighCourtImportStatusSyncService
 from app.services.queue_service import QueueService
 from app.tasks.celery_app import celery_app
 
 settings = get_settings()
 queue_service = QueueService()
+high_court_sync_service = HighCourtImportStatusSyncService()
 
 # INDEX_READY is an intermediate fast-stage status, not terminal.
 TERMINAL_DOC_STATUSES = {"CHAT_READY", "COMPLETED", "APPROVED", "REVIEW_REQUIRED"}
@@ -32,6 +34,16 @@ QUEUE_MAX_ATTEMPTS = {
     "FAST_INDEX": 2,
     "FULL_PROCESS": 2,
 }
+
+
+def _sync_high_court_import_job(db, doc: Document | None, error_message: str | None = None) -> None:
+    if not doc:
+        return
+    try:
+        high_court_sync_service.sync_document(db, doc, commit=False, error_message=error_message)
+        db.commit()
+    except Exception:
+        pass
 
 
 class _QueueHeartbeat:
@@ -193,6 +205,7 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
             doc.current_step = f"Auto-retrying FAST_INDEX ({attempt_count}/{max_attempts})"
             db.add(doc)
             db.commit()
+            _sync_high_court_import_job(db, doc)
 
             _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
             return {
@@ -206,6 +219,7 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
         doc.current_step = "Auto-stopped after repeated stale FAST_INDEX"
         db.add(doc)
         db.commit()
+        _sync_high_court_import_job(db, doc)
 
         _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
         if doc.batch_no:
@@ -224,6 +238,7 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
             doc.current_step = f"Auto-retrying FULL_PROCESS ({attempt_count}/{max_attempts})"
             db.add(doc)
             db.commit()
+            _sync_high_court_import_job(db, doc)
 
             if doc.batch_no:
                 _enqueue_batch_full_process_when_ready(db, doc.batch_no)
@@ -242,6 +257,7 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
         doc.current_step = "Auto-stopped after repeated stale FULL_PROCESS"
         db.add(doc)
         db.commit()
+        _sync_high_court_import_job(db, doc, error_message=doc.current_step)
 
         return {
             "document_id": doc.id,
@@ -293,6 +309,7 @@ def enqueue_document_pipeline(db, document_id: int) -> dict:
     doc.current_step = "Queued for indexing"
     db.add(doc)
     db.commit()
+    _sync_high_court_import_job(db, doc)
 
     if _has_active_fast_index(db):
         return {
@@ -325,6 +342,7 @@ def fast_index(self, document_id: int):
             result = FastIndexPipeline().run(db, doc)
 
         if result.get("rows", 0) <= 0:
+            _sync_high_court_import_job(db, doc)
             queue_service.mark_terminal(db, self.request.id, "FAILED")
             _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
             if doc.batch_no:
@@ -354,6 +372,7 @@ def fast_index(self, document_id: int):
             doc.current_step = str(exc)[:120]
             db.add(doc)
             db.commit()
+            _sync_high_court_import_job(db, doc, error_message=doc.current_step)
         queue_service.mark_terminal(db, self.request.id, "FAILED")
         if doc and doc.batch_no:
             _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
@@ -393,6 +412,7 @@ def full_process(self, document_id: int):
         doc.current_step = "Auto-approved"
         db.add(doc)
         db.commit()
+        _sync_high_court_import_job(db, doc)
 
         queue_service.mark_terminal(db, self.request.id, "COMPLETED")
         return {"ok": True}
@@ -403,6 +423,7 @@ def full_process(self, document_id: int):
             doc.current_step = str(exc)[:120]
             db.add(doc)
             db.commit()
+            _sync_high_court_import_job(db, doc, error_message=doc.current_step)
         queue_service.mark_terminal(db, self.request.id, "FAILED")
         raise
     finally:

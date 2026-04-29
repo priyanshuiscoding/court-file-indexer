@@ -89,6 +89,18 @@ class Settings(BaseSettings):
     HC_MOUNT_ROOT: str = "/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final"
     HC_IMPORT_LIMIT: int = 10
     HC_SOURCE_SYSTEM: str = "high_court_mysql"
+    HC_MYSQL_MARK_COMPLETE_ENABLED: bool = False
+    HC_MYSQL_COMPLETE_FIELD: str = "completed"
+    HC_MYSQL_INDEX_DATE_FIELD: str = "indexing_com_date"
+    HC_SCHEDULER_ENABLED: bool = False
+    HC_SCHEDULER_IMPORT_EVERY_SECONDS: int = 300
+    HC_SCHEDULER_IMPORT_LIMIT: int = 10
+    HC_SCHEDULER_SYNC_STATUS_EVERY_SECONDS: int = 120
+    HC_SCHEDULER_MARK_COMPLETE_ENABLED: bool = False
+    HC_SCHEDULER_MARK_COMPLETE_EVERY_SECONDS: int = 300
+    HC_SCHEDULER_MARK_COMPLETE_LIMIT: int = 50
+    CLIENT_API_KEY: str = ""
+    ENABLE_CLIENT_API_AUTH: bool = True
 
     @property
     def sqlalchemy_database_uri(self) -> str:

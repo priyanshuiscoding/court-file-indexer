@@ -5,6 +5,7 @@ from app.models.document_batch import DocumentBatch
 from app.models.document_chat_message import DocumentChatMessage
 from app.models.document_page import DocumentPage
 from app.models.index_row import IndexRow
+from app.models.high_court_import_job import HighCourtImportJob
 from app.models.processing_job import ProcessingJob
 from app.models.processing_log import ProcessingLog
 from app.models.queue_item import QueueItem
@@ -17,6 +18,7 @@ __all__ = [
     "DocumentChatMessage",
     "DocumentPage",
     "IndexRow",
+    "HighCourtImportJob",
     "ProcessingJob",
     "ProcessingLog",
     "QueueItem",

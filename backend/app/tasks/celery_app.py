@@ -15,6 +15,7 @@ celery_app = Celery(
         "app.tasks.document_tasks",
         "app.tasks.ops_tasks",
         "app.tasks.external_fetch_tasks",
+        "app.tasks.high_court_scheduled_tasks",
     ],
 )
 
@@ -42,3 +43,26 @@ celery_app.conf.beat_schedule = {
     #     "schedule": 300.0,
     # },
 }
+
+if settings.HC_SCHEDULER_ENABLED:
+    celery_app.conf.beat_schedule.update(
+        {
+            "high-court-import-pending": {
+                "task": "high_court.import_pending_scheduled",
+                "schedule": settings.HC_SCHEDULER_IMPORT_EVERY_SECONDS,
+            },
+            "high-court-sync-status": {
+                "task": "high_court.sync_status_scheduled",
+                "schedule": settings.HC_SCHEDULER_SYNC_STATUS_EVERY_SECONDS,
+            },
+        }
+    )
+    if settings.HC_SCHEDULER_MARK_COMPLETE_ENABLED:
+        celery_app.conf.beat_schedule.update(
+            {
+                "high-court-mark-completed": {
+                    "task": "high_court.mark_completed_scheduled",
+                    "schedule": settings.HC_SCHEDULER_MARK_COMPLETE_EVERY_SECONDS,
+                }
+            }
+        )

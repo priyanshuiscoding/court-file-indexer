@@ -89,3 +89,58 @@ export type ChatMessage = {
   citations_json?: string | null;
   created_at: string;
 };
+
+export type HighCourtImportJob = {
+  id: number;
+  source_system: string;
+  external_row_id?: string | null;
+  batch_no: string;
+  fil_no?: string | null;
+  source_pdf_path?: string | null;
+  document_id?: number | null;
+  status: string;
+  error_message?: string | null;
+  import_attempts: number;
+  last_attempt_at?: string | null;
+  imported_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type HighCourtJobListResponse = {
+  ok: boolean;
+  count: number;
+  jobs: HighCourtImportJob[];
+};
+
+export type HighCourtSchedulerStatus = {
+  enabled: boolean;
+  import_every_seconds: number;
+  import_limit: number;
+  sync_status_every_seconds: number;
+  mark_complete_enabled: boolean;
+  mark_complete_every_seconds: number;
+  mark_complete_limit: number;
+  external_mysql_mark_complete_enabled: boolean;
+};
+
+export type HighCourtImportItemResult = {
+  external_row_id?: number | string | null;
+  batch_no?: string | null;
+  fil_no?: string | null;
+  pdf_path?: string | null;
+  status: string;
+  document_id?: number | null;
+  error?: string | null;
+};
+
+export type HighCourtResultResponse = {
+  ok: boolean;
+  status?: string;
+  message?: string;
+  error?: string;
+  batch_no?: string;
+  document_id?: number | null;
+  json_path?: string;
+  index_json?: unknown;
+};

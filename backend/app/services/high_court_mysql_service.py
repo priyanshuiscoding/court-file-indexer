@@ -36,24 +36,33 @@ class HighCourtMySQLService:
     def fetch_pending_rows(self, limit: int) -> list[dict[str, Any]]:
         table = settings.HC_MYSQL_TABLE or "mp_indexing_batch"
         db_name = settings.HC_MYSQL_DB or "Digitization"
+        zero_date = "0000-00-00 00:00:00"
 
         query = f"""
-            SELECT *
+            SELECT id, batch_no, fil_no
             FROM `{db_name}`.`{table}`
-            WHERE branch = 1
-              AND completed = 0
-              AND indexing_com_date = 0
-              AND process_id = 1
-              AND clean_fl_pdf_gen_dt = 0
-            ORDER BY entry_dt ASC
+            WHERE branch = %s
+              AND completed = %s
+              AND indexing_com_date = %s
+              AND process_id = %s
+              AND clean_fl_pdf_gen_dt != %s
+            ORDER BY id ASC
             LIMIT %s
         """
+        params = (
+            1,
+            0,
+            zero_date,
+            1,
+            zero_date,
+            limit,
+        )
 
         logger.info("Fetching pending High Court rows limit=%s", limit)
 
         with self._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (limit,))
+                cur.execute(query, params)
                 rows = list(cur.fetchall())
 
         logger.info("Fetched %s pending High Court rows", len(rows))

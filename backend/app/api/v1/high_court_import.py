@@ -25,6 +25,7 @@ from app.services.high_court_import_service import HighCourtImportService
 from app.services.high_court_import_status_sync_service import HighCourtImportStatusSyncService
 from app.services.high_court_result_service import HighCourtResultService
 from app.services.high_court_mysql_service import HighCourtMySQLService
+from app.services.high_court_pdf_resolver_service import HighCourtPDFResolverService
 from app.tasks.high_court_scheduled_tasks import (
     import_pending_scheduled,
     mark_completed_scheduled,
@@ -39,6 +40,7 @@ status_sync_service = HighCourtImportStatusSyncService()
 result_service = HighCourtResultService()
 completion_service = HighCourtCompletionService()
 mysql_service = HighCourtMySQLService()
+pdf_resolver = HighCourtPDFResolverService()
 
 
 @router.post("/import-pending", response_model=HighCourtImportResponse)
@@ -47,6 +49,71 @@ def import_pending(payload: HighCourtImportRequest, db: Session = Depends(get_db
         return service.import_pending(db, limit=payload.limit)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/import-pending/dry-run")
+def dry_run_import_pending(payload: HighCourtImportRequest, db: Session = Depends(get_db)):
+    try:
+        limit = payload.limit or settings.HC_IMPORT_LIMIT
+        rows = service.mysql_service.fetch_pending_rows(limit)
+        results = []
+        found = 0
+        missing = 0
+
+        resolver = HighCourtPDFResolverService()
+
+        for row in rows:
+            batch_no = str(row.get("batch_no", "")).replace(",", "").strip()
+            item = {
+                "external_row_id": row.get("id"),
+                "batch_no": batch_no,
+                "fil_no": str(row.get("fil_no")) if row.get("fil_no") is not None else None,
+                "status": None,
+                "pdf_path": None,
+                "error": None,
+            }
+
+            try:
+                pdf_path = resolver.resolve_pdf(batch_no)
+                item["status"] = "FOUND"
+                item["pdf_path"] = str(pdf_path)
+                found += 1
+            except Exception as exc:
+                item["status"] = "PDF_NOT_FOUND"
+                item["error"] = str(exc)
+                missing += 1
+
+            results.append(item)
+
+        return {
+            "ok": missing == 0,
+            "fetched": len(rows),
+            "found": found,
+            "missing": missing,
+            "results": results,
+        }
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/resolve-pdf/{batch_no}")
+def resolve_pdf(batch_no: str):
+    try:
+        path = pdf_resolver.resolve_pdf(batch_no)
+        return {
+            "ok": True,
+            "batch_no": batch_no,
+            "pdf_path": str(path),
+            "file_name": path.name,
+            "size_bytes": path.stat().st_size,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "batch_no": batch_no,
+            "error": str(exc),
+        }
 
 
 @router.get("/import-jobs", response_model=HighCourtImportJobListResponse)

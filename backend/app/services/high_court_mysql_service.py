@@ -39,14 +39,14 @@ class HighCourtMySQLService:
         zero_date = "0000-00-00 00:00:00"
 
         query = f"""
-            SELECT id, batch_no, fil_no
+            SELECT id, batch_no, fil_no, entry_dt, total_pages
             FROM `{db_name}`.`{table}`
             WHERE branch = %s
               AND completed = %s
               AND indexing_com_date = %s
               AND process_id = %s
               AND clean_fl_pdf_gen_dt != %s
-            ORDER BY id ASC
+            ORDER BY entry_dt DESC
             LIMIT %s
         """
         params = (

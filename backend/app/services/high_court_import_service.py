@@ -95,7 +95,7 @@ class HighCourtImportService:
                     error="Missing batch_no",
                 )
 
-            batch_no_str = str(batch_no).strip()
+            batch_no_str = str(batch_no).replace(",", "").strip()
             fil_no_str = str(fil_no).strip() if fil_no is not None else None
             job = self.job_service.upsert_discovered(
                 db,
@@ -202,7 +202,7 @@ class HighCourtImportService:
                 db.commit()
             return HighCourtImportItemResult(
                 external_row_id=external_row_id,
-                batch_no=str(batch_no) if batch_no is not None else None,
+                batch_no=str(batch_no).replace(",", "").strip() if batch_no is not None else None,
                 fil_no=str(fil_no) if fil_no is not None else None,
                 pdf_path=None,
                 status="PDF_NOT_FOUND",
@@ -216,7 +216,7 @@ class HighCourtImportService:
                 db.commit()
             return HighCourtImportItemResult(
                 external_row_id=external_row_id,
-                batch_no=str(batch_no) if batch_no is not None else None,
+                batch_no=str(batch_no).replace(",", "").strip() if batch_no is not None else None,
                 fil_no=str(fil_no) if fil_no is not None else None,
                 pdf_path=None,
                 status="FAILED",

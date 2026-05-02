@@ -10,6 +10,7 @@ services:
       - ./storage:/app/storage
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     shm_size: "8gb"
 
@@ -24,6 +25,7 @@ services:
       - ./storage:/app/storage
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
     shm_size: "8gb"
 
@@ -38,6 +40,7 @@ services:
       - ./storage:/app/storage
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
+      - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
     command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
     shm_size: "8gb"
 

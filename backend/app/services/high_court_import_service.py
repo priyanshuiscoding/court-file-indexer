@@ -123,6 +123,10 @@ class HighCourtImportService:
             db.commit()
 
             pdf_path = self.pdf_resolver.resolve_pdf(batch_no_str)
+            if pdf_path is None:
+                raise FileNotFoundError(f"PDF not found for batch_no={batch_no_str}")
+            if not Path(pdf_path).exists():
+                raise FileNotFoundError(f"Resolved PDF missing on disk: {pdf_path}")
             self.job_service.mark_pdf_found(db, job, str(pdf_path))
             db.commit()
 

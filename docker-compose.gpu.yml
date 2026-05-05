@@ -26,7 +26,7 @@ services:
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
       - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
-    command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
+    command: celery -A app.tasks.celery_app.celery_app worker -Q vector_queue --loglevel=INFO --concurrency=1 --hostname=vector@%h
     shm_size: "8gb"
 
   worker_fast:
@@ -41,7 +41,7 @@ services:
       - hf_cache:/root/.cache/huggingface
       - torch_cache:/root/.cache/torch
       - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
-    command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
+    command: celery -A app.tasks.celery_app.celery_app worker -Q index_queue --loglevel=INFO --concurrency=2 --hostname=index@%h
     shm_size: "8gb"
 
 volumes:

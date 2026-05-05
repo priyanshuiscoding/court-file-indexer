@@ -55,7 +55,7 @@ services:
     volumes:
       - ./storage:/app/storage
       - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
-    command: celery -A app.tasks.celery_app.celery_app worker -Q full_process_q --loglevel=INFO --concurrency=1 --hostname=full@%h
+    command: celery -A app.tasks.celery_app.celery_app worker -Q vector_queue --loglevel=INFO --concurrency=1 --hostname=vector@%h
 
   worker_fast:
     build:
@@ -70,7 +70,7 @@ services:
     volumes:
       - ./storage:/app/storage
       - /mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:/mnt/hitachi_disk1/JBP/SCANNING/scaned_clean_final:ro
-    command: celery -A app.tasks.celery_app.celery_app worker -Q fast_index_q --loglevel=INFO --concurrency=2 --hostname=fast@%h
+    command: celery -A app.tasks.celery_app.celery_app worker -Q index_queue --loglevel=INFO --concurrency=2 --hostname=index@%h
 
   worker_beat:
     build:

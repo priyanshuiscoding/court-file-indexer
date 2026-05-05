@@ -387,7 +387,7 @@ def index_document_task(self, document_id: int):
 @celery_app.task(name="document.fast_index", bind=True)
 def fast_index(self, document_id: int):
     # Backward-compatible alias
-    return index_document_task.run(document_id)
+    return index_document_task(document_id)
 
 
 @celery_app.task(name="document.vectorize_document_task", bind=True)
@@ -444,7 +444,7 @@ def vectorize_document_task(self, document_id: int):
 @celery_app.task(name="document.full_process", bind=True)
 def full_process(self, document_id: int):
     # Backward-compatible alias
-    return vectorize_document_task.run(document_id)
+    return vectorize_document_task(document_id)
 
 
 @celery_app.task(name="queue.monitor_and_recover", bind=True)

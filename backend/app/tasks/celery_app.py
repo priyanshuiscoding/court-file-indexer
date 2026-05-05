@@ -4,8 +4,8 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-FAST_INDEX_QUEUE = "fast_index_q"
-FULL_PROCESS_QUEUE = "full_process_q"
+INDEX_QUEUE = "index_queue"
+VECTOR_QUEUE = "vector_queue"
 
 celery_app = Celery(
     "court_indexer",
@@ -22,13 +22,17 @@ celery_app = Celery(
 celery_app.conf.task_track_started = True
 celery_app.conf.result_expires = 3600
 celery_app.conf.broker_connection_retry_on_startup = True
-celery_app.conf.task_default_queue = FULL_PROCESS_QUEUE
+celery_app.conf.task_default_queue = INDEX_QUEUE
 celery_app.conf.task_routes = {
-    "document.fast_index": {"queue": FAST_INDEX_QUEUE},
-    "document.full_process": {"queue": FULL_PROCESS_QUEUE},
-    "queue.monitor_and_recover": {"queue": FAST_INDEX_QUEUE},
-    "ops.ping": {"queue": FAST_INDEX_QUEUE},
-    "integration.fetch_external_batch": {"queue": FAST_INDEX_QUEUE},
+    # New split-pipeline task names
+    "document.index_document_task": {"queue": INDEX_QUEUE},
+    "document.vectorize_document_task": {"queue": VECTOR_QUEUE},
+    # Backward compatibility
+    "document.fast_index": {"queue": INDEX_QUEUE},
+    "document.full_process": {"queue": VECTOR_QUEUE},
+    "queue.monitor_and_recover": {"queue": INDEX_QUEUE},
+    "ops.ping": {"queue": INDEX_QUEUE},
+    "integration.fetch_external_batch": {"queue": INDEX_QUEUE},
 }
 
 celery_app.conf.beat_schedule = {

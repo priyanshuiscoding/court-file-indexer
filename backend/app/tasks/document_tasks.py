@@ -28,11 +28,11 @@ TERMINAL_DOC_STATUSES = {"CHAT_READY", "COMPLETED", "APPROVED", "REVIEW_REQUIRED
 HEARTBEAT_TOUCH_SECONDS = max(15, min(30, int(settings.TASK_HEARTBEAT_SECONDS or 30)))
 QUEUE_STALE_SECONDS = {
     "FAST_INDEX": 300,   # 5 min without heartbeat
-    "FULL_PROCESS": 900, # 15 min without heartbeat
+    "VECTORIZE": 900, # 15 min without heartbeat
 }
 QUEUE_MAX_ATTEMPTS = {
     "FAST_INDEX": 2,
-    "FULL_PROCESS": 2,
+    "VECTORIZE": 2,
 }
 
 
@@ -84,7 +84,7 @@ def _has_active_for_document(db, document_id: int) -> bool:
 
 
 def _enqueue_fast_task(db, document_id: int):
-    task = fast_index.delay(document_id)
+    task = index_document_task.delay(document_id)
     queue_service.enqueue_task(
         db,
         queue_name="FAST_INDEX",
@@ -96,10 +96,10 @@ def _enqueue_fast_task(db, document_id: int):
 
 
 def _enqueue_full_task(db, document_id: int):
-    task = full_process.delay(document_id)
+    task = vectorize_document_task.delay(document_id)
     queue_service.enqueue_task(
         db,
-        queue_name="FULL_PROCESS",
+        queue_name="VECTORIZE",
         document_id=document_id,
         task_id=task.id,
         priority=50,
@@ -146,7 +146,7 @@ def _batch_has_pending_fast_candidates(db, batch_no: str) -> bool:
     return False
 
 
-def _enqueue_batch_full_process_when_ready(db, batch_no: str) -> int:
+def _enqueue_batch_vectorize_when_ready(db, batch_no: str) -> int:
     if _has_active_fast_index(db):
         return 0
 
@@ -223,7 +223,7 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
 
         _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
         if doc.batch_no:
-            _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+            _enqueue_batch_vectorize_when_ready(db, doc.batch_no)
 
         return {
             "document_id": doc.id,
@@ -232,16 +232,16 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
             "attempt_count": attempt_count,
         }
 
-    if queue_name == "FULL_PROCESS":
+    if queue_name == "VECTORIZE":
         if attempt_count < max_attempts:
             doc.status = "INDEX_READY"
-            doc.current_step = f"Auto-retrying FULL_PROCESS ({attempt_count}/{max_attempts})"
+            doc.current_step = f"Auto-retrying VECTORIZE ({attempt_count}/{max_attempts})"
             db.add(doc)
             db.commit()
             _sync_high_court_import_job(db, doc)
 
             if doc.batch_no:
-                _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+                _enqueue_batch_vectorize_when_ready(db, doc.batch_no)
             else:
                 if not _has_active_for_document(db, doc.id):
                     _enqueue_full_task(db, doc.id)
@@ -249,12 +249,12 @@ def _recover_stale_row(db, row: QueueItem) -> dict:
             return {
                 "document_id": doc.id,
                 "queue_name": queue_name,
-                "action": "retried_full_process",
+                "action": "retried_vectorize",
                 "attempt_count": attempt_count,
             }
 
         doc.status = "FAILED"
-        doc.current_step = "Auto-stopped after repeated stale FULL_PROCESS"
+        doc.current_step = "Auto-stopped after repeated stale VECTORIZE"
         db.add(doc)
         db.commit()
         _sync_high_court_import_job(db, doc, error_message=doc.current_step)
@@ -322,8 +322,8 @@ def enqueue_document_pipeline(db, document_id: int) -> dict:
     return {"ok": True, "fast_task_id": task.id}
 
 
-@celery_app.task(name="document.fast_index", bind=True)
-def fast_index(self, document_id: int):
+@celery_app.task(name="document.index_document_task", bind=True)
+def index_document_task(self, document_id: int):
     db = SessionLocal()
     try:
         queue_service.mark_started(db, self.request.id)
@@ -346,23 +346,24 @@ def fast_index(self, document_id: int):
             queue_service.mark_terminal(db, self.request.id, "FAILED")
             _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
             if doc.batch_no:
-                _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+                _enqueue_batch_vectorize_when_ready(db, doc.batch_no)
             return {"ok": False, "error": "No index rows extracted"}
 
         if not doc.batch_no:
             has_active_full = any(
-                item.queue_name == "FULL_PROCESS"
+                item.queue_name == "VECTORIZE"
                 for item in queue_service.active_for_document(db, document_id)
             )
             if not has_active_full and doc.status not in {"STOPPED", "CANCELLED"}:
                 _enqueue_full_task(db, document_id)
 
+        print(f"Index completed for document {document_id}")
         queue_service.mark_terminal(db, self.request.id, "COMPLETED")
 
         _start_next_fast_if_possible(db, preferred_batch=doc.batch_no)
 
         if doc.batch_no:
-            _enqueue_batch_full_process_when_ready(db, doc.batch_no)
+            _enqueue_batch_vectorize_when_ready(db, doc.batch_no)
 
         return result
     except Exception as exc:
@@ -383,8 +384,14 @@ def fast_index(self, document_id: int):
         db.close()
 
 
-@celery_app.task(name="document.full_process", bind=True)
-def full_process(self, document_id: int):
+@celery_app.task(name="document.fast_index", bind=True)
+def fast_index(self, document_id: int):
+    # Backward-compatible alias
+    return index_document_task.run(document_id)
+
+
+@celery_app.task(name="document.vectorize_document_task", bind=True)
+def vectorize_document_task(self, document_id: int):
     db = SessionLocal()
     try:
         queue_service.mark_started(db, self.request.id)
@@ -397,8 +404,12 @@ def full_process(self, document_id: int):
         if doc.status in {"STOPPED", "CANCELLED"}:
             queue_service.mark_terminal(db, self.request.id, "CANCELLED")
             return {"ok": False, "cancelled": True}
+        if doc.is_vectorized and doc.status in {"CHAT_READY", "VECTORIZED", "APPROVED", "REVIEW_REQUIRED"}:
+            queue_service.mark_terminal(db, self.request.id, "COMPLETED")
+            return {"ok": True, "skipped": "already_vectorized"}
 
         with _QueueHeartbeat(self.request.id):
+            print(f"Vectorization started for document {document_id}")
             pages = OCRPipeline().run_full(db, doc)
             queue_service.touch(db, self.request.id)
 
@@ -428,6 +439,12 @@ def full_process(self, document_id: int):
         raise
     finally:
         db.close()
+
+
+@celery_app.task(name="document.full_process", bind=True)
+def full_process(self, document_id: int):
+    # Backward-compatible alias
+    return vectorize_document_task.run(document_id)
 
 
 @celery_app.task(name="queue.monitor_and_recover", bind=True)

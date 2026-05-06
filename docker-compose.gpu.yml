@@ -1,7 +1,10 @@
 services:
   backend:
+    runtime: nvidia
     gpus: all
     environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
       HF_HOME: /root/.cache/huggingface
       TRANSFORMERS_CACHE: /root/.cache/huggingface
       CUDA_VISIBLE_DEVICES: "0"
@@ -15,8 +18,11 @@ services:
     shm_size: "8gb"
 
   worker:
+    runtime: nvidia
     gpus: all
     environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
       HF_HOME: /root/.cache/huggingface
       TRANSFORMERS_CACHE: /root/.cache/huggingface
       CUDA_VISIBLE_DEVICES: "0"
@@ -30,8 +36,11 @@ services:
     shm_size: "8gb"
 
   worker_fast:
+    runtime: nvidia
     gpus: all
     environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
       HF_HOME: /root/.cache/huggingface
       TRANSFORMERS_CACHE: /root/.cache/huggingface
       CUDA_VISIBLE_DEVICES: "0"

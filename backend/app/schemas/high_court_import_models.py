@@ -22,6 +22,7 @@ class HighCourtImportItemResult(BaseModel):
 class HighCourtImportResponse(BaseModel):
     ok: bool
     fetched: int
+    imported: int
     queued: int
     skipped: int
     failed: int

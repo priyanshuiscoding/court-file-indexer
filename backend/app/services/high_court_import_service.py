@@ -30,36 +30,67 @@ class HighCourtImportService:
 
     def import_pending(self, db: Session, limit: int | None = None) -> HighCourtImportResponse:
         effective_limit = min(500, int(limit or settings.HC_IMPORT_LIMIT or 10))
-        logger.info("High Court import_pending started limit=%s", effective_limit)
-        rows = self.mysql_service.fetch_pending_rows(effective_limit)
+        # Read a larger window so we can skip already-seen rows and still move forward.
+        source_window = min(5000, max(effective_limit * 10, effective_limit))
+        logger.info("High Court import_pending started limit=%s source_window=%s", effective_limit, source_window)
+        rows = self.mysql_service.fetch_pending_rows(source_window)
+        rows = sorted(rows, key=lambda r: str(r.get("batch_no", "")).replace(",", "").strip())
 
         results: list[HighCourtImportItemResult] = []
-        queued = 0
+        imported = 0
         skipped = 0
         failed = 0
+        considered = 0
 
         for row in rows:
+            if considered >= effective_limit:
+                break
+
+            batch_no = str(row.get("batch_no") or "").replace(",", "").strip()
+            if not batch_no:
+                results.append(
+                    HighCourtImportItemResult(
+                        external_row_id=row.get("id"),
+                        batch_no=None,
+                        fil_no=str(row.get("fil_no")) if row.get("fil_no") is not None else None,
+                        status="FAILED",
+                        error="Missing batch_no",
+                    )
+                )
+                failed += 1
+                continue
+
+            existing_job = self.job_service.get_by_batch_no(db, batch_no)
+            if existing_job and existing_job.status in {"QUEUED", "SKIPPED_DUPLICATE"}:
+                logger.info("Skipping already-processed High Court batch_no=%s status=%s", batch_no, existing_job.status)
+                skipped += 1
+                continue
+
+            considered += 1
             result = self._import_one(db, row)
             results.append(result)
             if result.status == "QUEUED":
-                queued += 1
+                imported += 1
+                logger.info("Imported High Court batch_no=%s document_id=%s", result.batch_no, result.document_id)
             elif result.status == "SKIPPED_DUPLICATE":
                 skipped += 1
+                logger.info("Skipped duplicate High Court batch_no=%s", result.batch_no)
             else:
                 failed += 1
 
         response = HighCourtImportResponse(
             ok=failed == 0,
             fetched=len(rows),
-            queued=queued,
+            imported=imported,
+            queued=imported,
             skipped=skipped,
             failed=failed,
             results=results,
         )
         logger.info(
-            "High Court import_pending completed fetched=%s queued=%s skipped=%s failed=%s",
+            "High Court import_pending completed fetched=%s imported=%s skipped=%s failed=%s",
             response.fetched,
-            response.queued,
+            response.imported,
             response.skipped,
             response.failed,
         )
@@ -129,6 +160,33 @@ class HighCourtImportService:
                 raise FileNotFoundError(f"Resolved PDF missing on disk: {pdf_path}")
             self.job_service.mark_pdf_found(db, job, str(pdf_path))
             db.commit()
+
+            # Duplicate protection by batch_no before creating a new document.
+            existing_by_batch = (
+                select(Document)
+                .where(Document.batch_no == batch_no_str)
+                .order_by(Document.created_at.desc())
+                .limit(1)
+            )
+            existing_doc = db.scalars(existing_by_batch).first()
+            if existing_doc:
+                self.job_service.mark_skipped_duplicate(
+                    db,
+                    job,
+                    document_id=existing_doc.id,
+                    pdf_path=str(pdf_path),
+                )
+                db.commit()
+                logger.info("Skipped High Court batch_no=%s because document already exists id=%s", batch_no_str, existing_doc.id)
+                return HighCourtImportItemResult(
+                    external_row_id=external_row_id,
+                    batch_no=batch_no_str,
+                    fil_no=fil_no_str,
+                    pdf_path=str(pdf_path),
+                    status="SKIPPED_DUPLICATE",
+                    document_id=existing_doc.id,
+                    error=None,
+                )
 
             stmt = (
                 select(Document)

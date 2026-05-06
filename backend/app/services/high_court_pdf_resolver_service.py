@@ -75,8 +75,8 @@ class HighCourtPDFResolverService:
             )
             return None
 
-        # Pick latest modified PDF.
-        pdfs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        # Pick first PDF deterministically (alphabetical) for stable repeatable imports.
+        pdfs.sort(key=lambda p: p.name.lower())
         selected = pdfs[0]
         logger.info(
             "[HC_IMPORT] batch_no=%s resolved_path=%s exists=true pdf_count=%s selected=%s selected_mtime=%s",
@@ -87,3 +87,12 @@ class HighCourtPDFResolverService:
             int(selected.stat().st_mtime),
         )
         return selected
+
+
+def resolve_pdf_path(batch_no: str | int) -> str | None:
+    """
+    Backward-compatible helper used by older call sites.
+    Returns resolved PDF path as string or None.
+    """
+    resolved = HighCourtPDFResolverService().resolve_pdf(batch_no)
+    return str(resolved) if resolved else None

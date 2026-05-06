@@ -46,7 +46,7 @@ class HighCourtMySQLService:
               AND indexing_com_date = %s
               AND process_id = %s
               AND clean_fl_pdf_gen_dt != %s
-            ORDER BY entry_dt DESC
+            ORDER BY batch_no ASC
             LIMIT %s
         """
         params = (
